@@ -42,7 +42,19 @@ from src.players.ai.minimax_strategy import MinimaxStrategy
 from src.ui.game_interface import GameInterface
 from src.ui.console_interface import ConsoleInterface
 
+"""
+Enhanced PyGame GUI integration with the Kulibrat game.
 
+To use this GUI:
+1. Make sure pygame is installed: pip install pygame
+2. Run the game with --interface pygame flag:
+   python main.py --interface pygame
+"""
+
+# Import the completed KulibratGUI class
+from src.ui.pygame_interface import KulibratGUI
+
+# Update main.py to support the pygame interface
 def setup_game_options() -> Dict[str, Any]:
     """
     Parse command line arguments and setup game options.
@@ -51,6 +63,14 @@ def setup_game_options() -> Dict[str, Any]:
         Dictionary of game options
     """
     parser = argparse.ArgumentParser(description="Kulibrat Game")
+    
+    # Add interface selection option
+    parser.add_argument(
+        "--interface", 
+        choices=["console", "pygame"],
+        default="console",
+        help="Choose game interface (console or pygame)"
+    )
     
     parser.add_argument(
         "--mode", 
@@ -74,104 +94,99 @@ def setup_game_options() -> Dict[str, Any]:
     )
     
     parser.add_argument(
-        "--delay", 
+        "--ai-delay", 
         type=float, 
         default=0.5,
         help="Delay between AI moves in seconds"
     )
     
+    parser.add_argument(
+        "--ai-color",
+        choices=["black", "red"],
+        default="red",
+        help="Color for the AI player in human-vs-ai mode"
+    )
+    
     return vars(parser.parse_args())
 
-
-def create_players(mode: str, interface, ai_algorithm: str = "random"):
-    """
-    Create players based on the selected mode.
+def main():
+    """Main entry point for the game."""
+    # Setup game options
+    options = setup_game_options()
     
-    Args:
-        mode: Game mode (human-vs-human, human-vs-ai, ai-vs-ai)
-        interface: UI interface for human players
-        ai_algorithm: AI algorithm to use ("random" or "minimax")
-        
-    Returns:
-        Dictionary mapping player colors to player objects
-    """
-    # Select AI strategy based on algorithm choice
-    if ai_algorithm == "minimax":
+    # Create interface based on user selection
+    if options["interface"] == "pygame":
+        try:
+            interface = KulibratGUI()
+            print("Using PyGame interface")
+        except ImportError:
+            print("PyGame not installed. Falling back to console interface.")
+            interface = ConsoleInterface()
+    else:
+        interface = ConsoleInterface()
+    
+    # Set up AI strategy based on selected algorithm
+    if options["ai_algorithm"] == "minimax":
         ai_strategy = MinimaxStrategy(max_depth=3, use_alpha_beta=True)
     else:  # random
         ai_strategy = RandomStrategy()
     
-    if mode == "human-vs-human":
+    # Create players based on selected mode
+    if options["mode"] == "human-vs-human":
         black_player = HumanPlayer(PlayerColor.BLACK, interface)
         red_player = HumanPlayer(PlayerColor.RED, interface)
-    elif mode == "human-vs-ai":
-        black_player = HumanPlayer(PlayerColor.BLACK, interface)
-        red_player = SimpleAIPlayer(PlayerColor.RED, ai_strategy)
+    elif options["mode"] == "human-vs-ai":
+        if options["ai_color"] == "black":
+            black_player = SimpleAIPlayer(PlayerColor.BLACK, ai_strategy)
+            red_player = HumanPlayer(PlayerColor.RED, interface)
+        else:  # AI is red
+            black_player = HumanPlayer(PlayerColor.BLACK, interface)
+            red_player = SimpleAIPlayer(PlayerColor.RED, ai_strategy)
     else:  # ai-vs-ai
         black_player = SimpleAIPlayer(PlayerColor.BLACK, ai_strategy)
-        red_player = SimpleAIPlayer(PlayerColor.RED, RandomStrategy())  # Second AI uses random strategy for variety
+        red_player = SimpleAIPlayer(PlayerColor.RED, ai_strategy if options["ai_algorithm"] != "random" else RandomStrategy())
     
-    return {
-        PlayerColor.BLACK: black_player,
-        PlayerColor.RED: red_player
-    }
-
-
-def main():
-    """Main entry point for the game."""
-    try:
-        # Setup game options
-        options = setup_game_options()
+    # Create game engine
+    engine = GameEngine(
+        black_player=black_player,
+        red_player=red_player,
+        interface=interface,
+        target_score=options["target_score"],
+        ai_delay=options["ai_delay"]
+    )
+    
+    # Welcome message (for console interface)
+    if options["interface"] == "console":
+        print("\n=== WELCOME TO KULIBRAT ===")
+        print(f"Game Mode: {options['mode']}")
+        print(f"Target Score: {options['target_score']}")
         
-        # Create interface
-        interface = ConsoleInterface()
+        if "ai" in options["mode"]:
+            print(f"AI Algorithm: {options['ai_algorithm']}")
+            print(f"AI Delay: {options['ai_delay']} seconds")
         
-        # Create players
-        players = create_players(options["mode"], interface, options["ai_algorithm"])
-        
-        # Create game engine
-        engine = GameEngine(
-            players[PlayerColor.BLACK], 
-            players[PlayerColor.RED], 
-            interface, 
-            options["target_score"]
-        )
-        
-        # Set delay for AI players
-        if options["mode"] in ["human-vs-ai", "ai-vs-ai"]:
-            print(f"AI will pause for {options['delay']} seconds between moves.")
-            time.sleep(1)
-        
-        # Start the game
-        print("\n=== Welcome to Kulibrat ===")
-        print("Starting game...")
+        print("\nStarting game...")
         time.sleep(1)
-        
-        # Run the game
+    
+    # Start the game
+    play_again = True
+    
+    while play_again:
         winner = engine.start_game()
         
-        # Ask if the player wants to play again
-        play_again = input("\nDo you want to play again? (y/n): ").lower().startswith('y')
-        
-        while play_again:
+        # For console interface, ask if the player wants to play again
+        if options["interface"] == "console":
+            play_again = input("\nDo you want to play again? (y/n): ").lower().startswith('y')
+        else:
+            # For PyGame interface, the play_again logic is handled in the show_winner method
+            play_again = False
+            
+        if play_again:
             # Reset the game
             engine.reset_game()
-            
-            # Start a new game
-            winner = engine.start_game()
-            
-            # Ask if the player wants to play again
-            play_again = input("\nDo you want to play again? (y/n): ").lower().startswith('y')
-        
-        print("\nThanks for playing Kulibrat!")
     
-    except ImportError as e:
-        print(f"Error importing modules: {e}")
-        print("\nCheck that your project structure matches the expected imports.")
-        print("You may need to create any missing modules or fix import statements.")
-    except Exception as e:
-        print(f"An error occurred: {e}")
-
+    if options["interface"] == "console":
+        print("\nThanks for playing Kulibrat!")
 
 if __name__ == "__main__":
     main()
