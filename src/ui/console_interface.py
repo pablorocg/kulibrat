@@ -1,10 +1,6 @@
-"""
-Console-based implementation of the game interface for Kulibrat.
-"""
-
 import os
 import time
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 import numpy as np
 
@@ -14,6 +10,125 @@ from src.core.move import Move
 from src.core.move_type import MoveType
 from src.core.player_color import PlayerColor
 from src.ui.game_interface import GameInterface
+
+
+import time
+from typing import List, Optional, Dict, Any
+
+# Import required game components
+from src.core.move import Move
+from src.core.move_type import MoveType
+from src.core.player_color import PlayerColor
+
+
+class GameStatistics:
+    def __init__(self):
+        # Basic tracking
+        self.total_turns = 0
+        self.moves_by_player = {
+            PlayerColor.BLACK: 0,
+            PlayerColor.RED: 0
+        }
+        self.captures_by_player = {
+            PlayerColor.BLACK: 0,
+            PlayerColor.RED: 0
+        }
+        
+        # Advanced tracking
+        self.move_types_used = {
+            PlayerColor.BLACK: {
+                MoveType.INSERT: 0,
+                MoveType.DIAGONAL: 0,
+                MoveType.ATTACK: 0,
+                MoveType.JUMP: 0
+            },
+            PlayerColor.RED: {
+                MoveType.INSERT: 0,
+                MoveType.DIAGONAL: 0,
+                MoveType.ATTACK: 0,
+                MoveType.JUMP: 0
+            }
+        }
+        
+        # Timing
+        self.game_start_time = time.time()
+        self.turn_start_times = {
+            PlayerColor.BLACK: [],
+            PlayerColor.RED: []
+        }
+        self.turn_end_times = {
+            PlayerColor.BLACK: [],
+            PlayerColor.RED: []
+        }
+    
+    def record_move(self, player: PlayerColor, move: Move):
+        """Record details of a move"""
+        # Increment moves for the specific player
+        self.moves_by_player[player] += 1
+        
+        # Track move type 
+        self.move_types_used[player][move.move_type] += 1
+    
+    def record_turn(self):
+        """Record a complete turn"""
+        self.total_turns += 1
+    
+    def record_capture(self, player: PlayerColor):
+        """Record a piece capture"""
+        self.captures_by_player[player] += 1
+    
+    def start_turn_timer(self, player: PlayerColor):
+        """Start timer for turn"""
+        self.turn_start_times[player].append(time.time())
+    
+    def end_turn_timer(self, player: PlayerColor):
+        """End timer and record turn time"""
+        if self.turn_start_times[player]:
+            # Record end time
+            self.turn_end_times[player].append(time.time())
+    
+    def get_summary(self) -> Dict[str, Any]:
+        """Generate comprehensive game summary"""
+        total_game_time = time.time() - self.game_start_time
+        
+        # Calculate turn times
+        turn_times = {}
+        for player in [PlayerColor.BLACK, PlayerColor.RED]:
+            # Ensure we have equal number of start and end times
+            start_times = self.turn_start_times[player]
+            end_times = self.turn_end_times[player]
+            
+            # Calculate turn durations
+            turn_durations = []
+            for start, end in zip(start_times, end_times):
+                turn_durations.append(end - start)
+            
+            # Calculate average turn time
+            if turn_durations:
+                turn_times[player.name] = f"{(sum(turn_durations) / len(turn_durations)):.2f} seconds"
+            else:
+                turn_times[player.name] = "No turns"
+        
+        return {
+            "total_turns": self.total_turns,
+            "total_game_time": f"{total_game_time:.2f} seconds",
+            "moves_by_player": {
+                player.name: moves 
+                for player, moves in self.moves_by_player.items()
+            },
+            "captures_by_player": {
+                player.name: captures 
+                for player, captures in self.captures_by_player.items()
+            },
+            "move_type_distribution": {
+                player.name: {
+                    move_type.name: count 
+                    for move_type, count in type_counts.items()
+                } 
+                for player, type_counts in self.move_types_used.items()
+            },
+            "average_turn_times": turn_times
+        }
 
 
 class ConsoleInterface(GameInterface):
@@ -26,8 +141,10 @@ class ConsoleInterface(GameInterface):
         Args:
             clear_screen: Whether to clear the screen between displays
         """
+        super().__init__()
         self.clear_screen = clear_screen
         self._selected_piece = None  # For move selection
+        self.statistics = GameStatistics()
     
     def clear(self):
         """Clear the console screen."""
@@ -46,6 +163,7 @@ class ConsoleInterface(GameInterface):
         print(f"\n==== KULIBRAT GAME ====")
         print(f"Target Score: {game_state.target_score}")
         print(f"Current Player: {game_state.current_player.name}")
+        print(f"Turn Number: {self.statistics.total_turns + 1}")
         print(f"Scores - BLACK: {game_state.scores[PlayerColor.BLACK]}, "
               f"RED: {game_state.scores[PlayerColor.RED]}")
         
@@ -100,7 +218,7 @@ class ConsoleInterface(GameInterface):
             print("  +---+---+---+  ")
     
     def get_human_move(self, game_state: GameState, player_color: PlayerColor, 
-                       valid_moves: List[Move]) -> Move:
+                   valid_moves: List[Move]) -> Move:
         """
         Get a move from a human player via the console.
         
@@ -112,6 +230,10 @@ class ConsoleInterface(GameInterface):
         Returns:
             A valid move selected by the human player
         """
+        # Start turn timer
+        self.statistics.start_turn_timer(player_color)
+        
+        # Display current game state
         self.display_state(game_state)
         
         # Display valid moves
@@ -124,7 +246,20 @@ class ConsoleInterface(GameInterface):
             try:
                 choice = int(input("\nEnter move number: ")) - 1
                 if 0 <= choice < len(valid_moves):
-                    return valid_moves[choice]
+                    # Get the selected move
+                    move = valid_moves[choice]
+                    
+                    # Record move statistics
+                    self.statistics.record_move(player_color, move)
+                    
+                    # If move is an attack, record capture
+                    if move.move_type == MoveType.ATTACK:
+                        self.statistics.record_capture(player_color)
+                    
+                    # End turn timer
+                    self.statistics.end_turn_timer(player_color)
+                    
+                    return move
                 else:
                     print("Invalid choice. Please try again.")
             except ValueError:
@@ -182,13 +317,46 @@ class ConsoleInterface(GameInterface):
             winner: The player who won, or None for a draw
             game_state: Final state of the game
         """
+        # Ensure the last turn is counted
+        if not self.statistics.total_turns:
+            self.statistics.record_turn()
+        
+        # Display game state
         self.display_state(game_state)
+        
+        # Show winner
         if winner:
             print(f"\n🏆 Game Over! {winner.name} player wins! 🏆")
             print(f"Final Score - BLACK: {game_state.scores[PlayerColor.BLACK]}, "
                   f"RED: {game_state.scores[PlayerColor.RED]}")
         else:
             print("\nGame Over! It's a draw!")
+        
+        # Display game statistics
+        print("\n==== GAME STATISTICS ====")
+        stats_summary = self.statistics.get_summary()
+        
+        # Custom formatting for detailed statistics
+        print(f"Total Turns: {stats_summary['total_turns']}")
+        print(f"Total Game Time: {stats_summary['total_game_time']}")
+        
+        print("\n--- Moves ---")
+        for player, moves in stats_summary['moves_by_player'].items():
+            print(f"{player} Moves: {moves}")
+        
+        print("\n--- Captures ---")
+        for player, captures in stats_summary['captures_by_player'].items():
+            print(f"{player} Captures: {captures}")
+        
+        print("\n--- Move Type Distribution ---")
+        for player, move_types in stats_summary['move_type_distribution'].items():
+            print(f"{player} Move Types:")
+            for move_type, count in move_types.items():
+                print(f"  {move_type}: {count}")
+        
+        print("\n--- Turn Times ---")
+        for player, avg_time in stats_summary['average_turn_times'].items():
+            print(f"{player} Average Turn Time: {avg_time}")
     
     def show_message(self, message: str) -> None:
         """

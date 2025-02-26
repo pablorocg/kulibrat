@@ -23,7 +23,7 @@ from typing import Dict, Any
 
 # Import core components
 from src.core.player_color import PlayerColor
-from src.core.game_state import GameState
+# from src.core.game_state import GameState
 from src.core.game_engine import GameEngine
 
 # Import player implementations
@@ -34,6 +34,7 @@ from src.players.ai.minimax_strategy import MinimaxStrategy
 
 # Import UI components
 from src.ui.console_interface import ConsoleInterface
+from src.ui.pygame_interface import KulibratGUI
 
 
 def setup_game_options() -> Dict[str, Any]:
@@ -44,6 +45,14 @@ def setup_game_options() -> Dict[str, Any]:
         Dictionary of game options
     """
     parser = argparse.ArgumentParser(description="Kulibrat Game")
+
+    # Añade una opción para seleccionar la interfaz
+    parser.add_argument(
+        "--interface", 
+        choices=["console", "pygame"],
+        default="console",
+        help="Choose game interface"
+    )
     
     parser.add_argument(
         "--mode", 
@@ -89,7 +98,10 @@ def main():
     options = setup_game_options()
     
     # Create interface
-    interface = ConsoleInterface()
+    if options["interface"] == "pygame":
+        interface = KulibratGUI()
+    else:
+        interface = ConsoleInterface()
     
     # Set up AI strategy based on selected algorithm
     if options["ai_algorithm"] == "minimax":
@@ -110,7 +122,7 @@ def main():
             red_player = SimpleAIPlayer(PlayerColor.RED, ai_strategy)
     else:  # ai-vs-ai
         black_player = SimpleAIPlayer(PlayerColor.BLACK, ai_strategy)
-        red_player = SimpleAIPlayer(PlayerColor.RED, RandomStrategy())
+        red_player = SimpleAIPlayer(PlayerColor.RED, ai_strategy)#RandomStrategy()
     
     # Create game engine
     engine = GameEngine(
