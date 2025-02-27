@@ -18,8 +18,8 @@ class PlayerColor(Enum):
             Returns 1 for BLACK (positive direction) and -1 for RED (negative direction).
     """
 
-    BLACK = 1 # Player 1
-    RED = -1 # Player 2
+    BLACK = 1  # Player 1
+    RED = -1  # Player 2
 
     def opposite(self):
         return PlayerColor.RED if self == PlayerColor.BLACK else PlayerColor.BLACK

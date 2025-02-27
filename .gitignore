@@ -1,11 +1,12 @@
-__pycache__/*
-*.pyc
-*.pyo
+# Python compiled files
+__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
 
-# rl_model.py
-# rl_strategy.py
-# train_rl_agent.py
-# rl_player.py
-*.pyc
+# Model files
 models/*
-src/ui/__pycache__/__init__.cpython-310.pyc
+
+# Documentation
+rules/rules.md
+
