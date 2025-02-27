@@ -38,7 +38,7 @@ from src.ui.asset_manager import AssetManager
 class KulibratGUI(GameInterface):
     """Enhanced graphical interface for the Kulibrat game with smooth animations."""
     
-    def __init__(self, screen_width=1024, screen_height=768):
+    def __init__(self, screen_width=2000, screen_height=768):
         """Initialize the GUI with responsive sizing."""
         pygame.init()
         pygame.display.set_caption('Kulibrat - Strategic Board Game')

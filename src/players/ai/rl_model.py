@@ -73,7 +73,7 @@ class KulibratNet(nn.Module):
         # - End position (board_size[0] * board_size[1] possibilities or none)
         # For simplicity, we'll output a probability for each possible action
         # (we can have maximum board_size[0]*board_size[1]*4 different actions)
-        num_actions = 46 # board_size[0] * board_size[1] * 4
+        num_actions = 51 # board_size[0] * board_size[1] * 4
         self.policy_fc = nn.Linear(policy_flat_size, num_actions)
 
         # Value head
