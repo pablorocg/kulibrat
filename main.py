@@ -73,7 +73,7 @@ def setup_game_options() -> Dict[str, Any]:
     parser.add_argument(
         "--ai-algorithm",
         choices=["random", "minimax", "mcts"],
-        default="mcts",
+        default="random",
         help="AI algorithm to use (random, minimax, mcts)",
     )
 
@@ -158,7 +158,7 @@ def main():
     # In the main function, modify the AI strategy selection:
     # Set up AI strategy based on selected algorithm
     if options["ai_algorithm"] == "minimax":
-        ai_strategy = MinimaxStrategy(max_depth=3, use_alpha_beta=True)
+        ai_strategy = MinimaxStrategy(max_depth=6, use_alpha_beta=True)
     elif options["ai_algorithm"] == "mcts":  # Add this condition
         ai_strategy = MCTSStrategy(
             simulation_time=options["mcts_time"],
