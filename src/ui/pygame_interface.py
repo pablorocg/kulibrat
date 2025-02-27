@@ -62,36 +62,53 @@ class KulibratGUI(GameInterface):
         # Initialize asset manager
         self.asset_manager = AssetManager()
 
-        # Font setup
+        # Font setup with responsive sizing
         pygame.font.init()
+        
+        # Calculate font sizes based on screen dimensions
+        # This ensures text scales appropriately on different screen sizes
+        font_size_factor = min(self.SCREEN_WIDTH / 1024, self.SCREEN_HEIGHT / 768)
+        
+        # Ensure minimum readable sizes and maximum sizes for very large screens
+        def responsive_size(base_size):
+            size = int(base_size * font_size_factor)
+            return max(10, min(size, base_size * 2))  # Min 10px, max 2x original size
+        
+        # Apply responsive font sizes
+        title_size = responsive_size(48)
+        header_size = responsive_size(32)
+        normal_size = responsive_size(24)
+        small_size = responsive_size(18)
+        tiny_size = responsive_size(14)
+        
         try:
             font_path = os.path.join(
                 "src", "ui", "assets", "fonts", "Roboto-Regular.ttf"
             )
             if os.path.exists(font_path):
                 self.FONTS = {
-                    "TITLE": pygame.font.Font(font_path, 48),
-                    "HEADER": pygame.font.Font(font_path, 32),
-                    "NORMAL": pygame.font.Font(font_path, 24),
-                    "SMALL": pygame.font.Font(font_path, 18),
-                    "TINY": pygame.font.Font(font_path, 14),
+                    "TITLE": pygame.font.Font(font_path, title_size),
+                    "HEADER": pygame.font.Font(font_path, header_size),
+                    "NORMAL": pygame.font.Font(font_path, normal_size),
+                    "SMALL": pygame.font.Font(font_path, small_size),
+                    "TINY": pygame.font.Font(font_path, tiny_size),
                 }
             else:
                 self.FONTS = {
-                    "TITLE": pygame.font.SysFont("Arial", 48),
-                    "HEADER": pygame.font.SysFont("Arial", 32),
-                    "NORMAL": pygame.font.SysFont("Arial", 24),
-                    "SMALL": pygame.font.SysFont("Arial", 18),
-                    "TINY": pygame.font.SysFont("Arial", 14),
+                    "TITLE": pygame.font.SysFont("Arial", title_size),
+                    "HEADER": pygame.font.SysFont("Arial", header_size),
+                    "NORMAL": pygame.font.SysFont("Arial", normal_size),
+                    "SMALL": pygame.font.SysFont("Arial", small_size),
+                    "TINY": pygame.font.SysFont("Arial", tiny_size),
                 }
         except:
             # Fallback to system fonts if custom font fails
             self.FONTS = {
-                "TITLE": pygame.font.SysFont("Arial", 48),
-                "HEADER": pygame.font.SysFont("Arial", 32),
-                "NORMAL": pygame.font.SysFont("Arial", 24),
-                "SMALL": pygame.font.SysFont("Arial", 18),
-                "TINY": pygame.font.SysFont("Arial", 14),
+                "TITLE": pygame.font.SysFont("Arial", title_size),
+                "HEADER": pygame.font.SysFont("Arial", header_size),
+                "NORMAL": pygame.font.SysFont("Arial", normal_size),
+                "SMALL": pygame.font.SysFont("Arial", small_size),
+                "TINY": pygame.font.SysFont("Arial", tiny_size),
             }
 
         # Game configuration
@@ -120,34 +137,65 @@ class KulibratGUI(GameInterface):
             self.SCREEN_WIDTH, self.SCREEN_HEIGHT = self.screen.get_size()
             self.fullscreen = False
 
-        # Layout calculations - updated for responsive design
+        # Layout calculations - improved responsive design
+        
+        # Dynamic margins that scale with screen size
         self.BOARD_MARGIN_X = int(self.SCREEN_WIDTH * 0.03)  # Dynamic margins
         self.BOARD_MARGIN_Y = int(self.SCREEN_HEIGHT * 0.05)
-
-        # Responsive sidebar width based on screen dimensions
-        sidebar_ratio = 0.25 if self.SCREEN_WIDTH > 1200 else 0.3
-        self.SIDEBAR_WIDTH = int(self.SCREEN_WIDTH * sidebar_ratio)
+        
+        # Check screen aspect ratio to determine optimal layout
+        aspect_ratio = self.SCREEN_WIDTH / self.SCREEN_HEIGHT
+        
+        # Responsive sidebar width based on screen dimensions and aspect ratio
+        # Narrower sidebar on portrait-like screens, wider on landscape
+        if aspect_ratio < 1.0:  # Portrait orientation
+            sidebar_ratio = 0.15  # Much smaller sidebar on portrait screens
+            min_sidebar_width = int(self.SCREEN_WIDTH * 0.15)
+            max_sidebar_width = int(self.SCREEN_WIDTH * 0.3)
+        elif aspect_ratio < 1.33:  # Standard 4:3 and similar
+            sidebar_ratio = 0.25
+            min_sidebar_width = 180
+            max_sidebar_width = int(self.SCREEN_WIDTH * 0.3)
+        else:  # Widescreen and ultrawide
+            sidebar_ratio = 0.2 if self.SCREEN_WIDTH > 1200 else 0.25
+            min_sidebar_width = 200
+            max_sidebar_width = 500
+        
+        # Calculate sidebar width with minimum and maximum constraints
+        raw_sidebar_width = int(self.SCREEN_WIDTH * sidebar_ratio)
+        self.SIDEBAR_WIDTH = max(min_sidebar_width, min(raw_sidebar_width, max_sidebar_width))
+        
+        # Ensure sidebar width doesn't take too much space on small screens
+        if self.SCREEN_WIDTH < 600:
+            self.SIDEBAR_WIDTH = min(self.SIDEBAR_WIDTH, int(self.SCREEN_WIDTH * 0.25))
+        
         self.BOARD_AREA_WIDTH = self.SCREEN_WIDTH - self.SIDEBAR_WIDTH
 
         # Board dimensions
         self.BOARD_ROWS = 4
         self.BOARD_COLS = 3
 
-        # Calculate cell size based on available space - larger on bigger screens
-        max_area_width = min(
-            self.BOARD_AREA_WIDTH - 2 * self.BOARD_MARGIN_X,
-            self.SCREEN_HEIGHT
-            - 2 * self.BOARD_MARGIN_Y * 1.2,  # Slightly more vertical space
-        )
-
-        # Ensure board fits proportionally to the screen
-        self.CELL_SIZE = int(
-            max_area_width / max(self.BOARD_COLS, self.BOARD_ROWS * 1.05)
-        )
-
-        # Board position - centered in the available area
+        # Calculate available space for the board
+        available_width = self.BOARD_AREA_WIDTH - 2 * self.BOARD_MARGIN_X
+        available_height = self.SCREEN_HEIGHT - 2 * self.BOARD_MARGIN_Y
+        
+        # Determine optimal cell size to fit either width or height
+        width_based_cell = available_width / self.BOARD_COLS
+        height_based_cell = available_height / self.BOARD_ROWS
+        
+        # Choose smaller value to ensure board fits on screen
+        # Adding a padding factor to prevent board from touching edges
+        self.CELL_SIZE = int(min(width_based_cell, height_based_cell) * 0.95)
+        
+        # Ensure minimum cell size for playability
+        min_cell_size = 40
+        self.CELL_SIZE = max(min_cell_size, self.CELL_SIZE)
+        
+        # Recalculate board dimensions based on cell size
         self.BOARD_WIDTH = self.CELL_SIZE * self.BOARD_COLS
         self.BOARD_HEIGHT = self.CELL_SIZE * self.BOARD_ROWS
+        
+        # Center the board in the available area
         self.BOARD_X = int((self.BOARD_AREA_WIDTH - self.BOARD_WIDTH) / 2)
         self.BOARD_Y = int((self.SCREEN_HEIGHT - self.BOARD_HEIGHT) / 2)
 
@@ -267,7 +315,7 @@ class KulibratGUI(GameInterface):
         )
 
     def _draw_sidebar(self):
-        """Draw the game information sidebar."""
+        """Draw the game information sidebar with adaptive layout."""
         if not self.current_game_state:
             return
 
@@ -275,12 +323,26 @@ class KulibratGUI(GameInterface):
         sidebar_x = self.BOARD_AREA_WIDTH
         sidebar_rect = pygame.Rect(sidebar_x, 0, self.SIDEBAR_WIDTH, self.SCREEN_HEIGHT)
         pygame.draw.rect(self.screen, self.COLORS["PANEL_BACKGROUND"], sidebar_rect)
-
-        # Game title
+        
+        # Get sidebar center for alignment
+        sidebar_center_x = sidebar_x + self.SIDEBAR_WIDTH // 2
+        
+        # Calculate responsive spacing based on screen height
+        # This ensures elements are properly spaced regardless of screen size
+        spacing_factor = self.SCREEN_HEIGHT / 768  # Base on standard height
+        spacing_unit = int(25 * spacing_factor)
+        
+        # Calculate vertical positions relative to screen height
+        # Use relative percentages rather than fixed pixel values
+        title_y = int(self.SCREEN_HEIGHT * 0.05)  # 5% from top
+        player_y = title_y + spacing_unit * 3
+        score_section_y = player_y + spacing_unit * 3
+        
+        # Game title with scaled positioning
         title = self.FONTS["TITLE"].render(
             "KULIBRAT", True, self.COLORS["PANEL_HEADER"]
         )
-        title_rect = title.get_rect(centerx=sidebar_x + self.SIDEBAR_WIDTH // 2, y=30)
+        title_rect = title.get_rect(centerx=sidebar_center_x, y=title_y)
         self.screen.blit(title, title_rect)
 
         # Current player indicator
@@ -295,45 +357,52 @@ class KulibratGUI(GameInterface):
             f"{current_player.name}'s Turn", True, player_color
         )
         player_rect = player_text.get_rect(
-            centerx=sidebar_x + self.SIDEBAR_WIDTH // 2, y=100
+            centerx=sidebar_center_x, y=player_y
         )
         self.screen.blit(player_text, player_rect)
 
-        # Score display
-        score_y = 170
+        # Score display section
         score_title = self.FONTS["NORMAL"].render(
             "SCORE", True, self.COLORS["TEXT_DARK"]
         )
         score_rect = score_title.get_rect(
-            centerx=sidebar_x + self.SIDEBAR_WIDTH // 2, y=score_y
+            centerx=sidebar_center_x, y=score_section_y
         )
         self.screen.blit(score_title, score_rect)
 
+        # Adaptively size UI elements based on sidebar width
+        # Ensure minimum sizes for playability
+        bar_width = max(100, int(self.SIDEBAR_WIDTH * 0.75))
+        bar_height = max(20, int(spacing_unit * 1.2))
+        
+        # Calculate margins to center elements
+        bar_x = sidebar_x + (self.SIDEBAR_WIDTH - bar_width) // 2
+        
         # Score values with visual indicator of target
         target_score = self.current_game_state.target_score
         black_score = self.current_game_state.scores[PlayerColor.BLACK]
         red_score = self.current_game_state.scores[PlayerColor.RED]
 
-        # Score bar background
-        bar_width = int(self.SIDEBAR_WIDTH * 0.7)
-        bar_height = 30
-        bar_x = sidebar_x + (self.SIDEBAR_WIDTH - bar_width) // 2
-        black_bar_y = score_y + 40
-        red_bar_y = black_bar_y + bar_height + 20
-
-        # Black score bar
+        # Black score bar (position based on score title)
+        black_bar_y = score_rect.bottom + spacing_unit
         black_progress = min(black_score / target_score, 1.0)
+        
+        # Background bar
         pygame.draw.rect(
             self.screen,
             (220, 220, 220),
             pygame.Rect(bar_x, black_bar_y, bar_width, bar_height),
+            border_radius=3
         )
+        
+        # Progress bar
         pygame.draw.rect(
             self.screen,
             self.COLORS["BLACK_SCORE"],
             pygame.Rect(
                 bar_x, black_bar_y, int(bar_width * black_progress), bar_height
             ),
+            border_radius=3
         )
 
         # Target marker on black bar
@@ -341,69 +410,117 @@ class KulibratGUI(GameInterface):
         pygame.draw.line(
             self.screen,
             self.COLORS["TEXT_ACCENT"],
-            (target_x, black_bar_y - 5),
-            (target_x, black_bar_y + bar_height + 5),
+            (target_x, black_bar_y - 3),
+            (target_x, black_bar_y + bar_height + 3),
             2,
         )
 
-        # Black score label
-        black_label = self.FONTS["NORMAL"].render(
-            f"BLACK: {black_score}/{target_score}", True, self.COLORS["BLACK_SCORE"]
+        # Black score label - responsive sizing for small screens
+        # Scale text to fit available width
+        black_score_text = f"BLACK: {black_score}/{target_score}"
+        black_label = self.FONTS["SMALL"].render(
+            black_score_text, True, self.COLORS["BLACK_SCORE"]
         )
-        black_label_rect = black_label.get_rect(
-            centerx=sidebar_x + self.SIDEBAR_WIDTH // 2, y=black_bar_y + bar_height + 5
-        )
-        self.screen.blit(black_label, (bar_x, black_bar_y + 5))
+        
+        # Check if label is too wide for the bar
+        if black_label.get_width() > bar_width - 10:
+            # Use tiny font or abbreviate text on small screens
+            black_label = self.FONTS["TINY"].render(
+                f"BLK: {black_score}/{target_score}", True, self.COLORS["BLACK_SCORE"]
+            )
+        
+        # Position label within the bar
+        label_y = black_bar_y + (bar_height - black_label.get_height()) // 2
+        self.screen.blit(black_label, (bar_x + 5, label_y))
 
-        # Red score bar
+        # Red score bar with spacing relative to black bar
+        red_bar_y = black_bar_y + bar_height + spacing_unit
         red_progress = min(red_score / target_score, 1.0)
+        
+        # Background bar
         pygame.draw.rect(
             self.screen,
             (220, 220, 220),
             pygame.Rect(bar_x, red_bar_y, bar_width, bar_height),
+            border_radius=3
         )
+        
+        # Progress bar
         pygame.draw.rect(
             self.screen,
             self.COLORS["RED_SCORE"],
             pygame.Rect(bar_x, red_bar_y, int(bar_width * red_progress), bar_height),
+            border_radius=3
         )
 
         # Target marker on red bar
         pygame.draw.line(
             self.screen,
             self.COLORS["TEXT_ACCENT"],
-            (target_x, red_bar_y - 5),
-            (target_x, red_bar_y + bar_height + 5),
+            (target_x, red_bar_y - 3),
+            (target_x, red_bar_y + bar_height + 3),
             2,
         )
 
-        # Red score label
-        red_label = self.FONTS["NORMAL"].render(
-            f"RED: {red_score}/{target_score}", True, self.COLORS["RED_SCORE"]
+        # Red score label - responsive sizing
+        red_score_text = f"RED: {red_score}/{target_score}"
+        red_label = self.FONTS["SMALL"].render(
+            red_score_text, True, self.COLORS["RED_SCORE"]
         )
-        red_label_rect = red_label.get_rect(
-            centerx=sidebar_x + self.SIDEBAR_WIDTH // 2, y=red_bar_y + bar_height + 5
-        )
-        self.screen.blit(red_label, (bar_x, red_bar_y + 5))
+        
+        # Check if label is too wide for the bar
+        if red_label.get_width() > bar_width - 10:
+            # Use tiny font or abbreviate text on small screens
+            red_label = self.FONTS["TINY"].render(
+                f"RED: {red_score}/{target_score}", True, self.COLORS["RED_SCORE"]
+            )
+        
+        # Position label within the bar
+        label_y = red_bar_y + (bar_height - red_label.get_height()) // 2
+        self.screen.blit(red_label, (bar_x + 5, label_y))
 
-        # Pieces off board information
-        pieces_y = red_bar_y + bar_height + 50
-        pieces_title = self.FONTS["NORMAL"].render(
-            "PIECES AVAILABLE", True, self.COLORS["TEXT_DARK"]
-        )
-        pieces_rect = pieces_title.get_rect(
-            centerx=sidebar_x + self.SIDEBAR_WIDTH // 2, y=pieces_y
-        )
+        # Calculate remaining space for the rest of the UI
+        remaining_height = self.SCREEN_HEIGHT - (red_bar_y + bar_height + spacing_unit)
+        
+        # Determine if we need to compress the layout for small screens
+        is_compact_layout = remaining_height < 300 or self.SCREEN_HEIGHT < 600
+        
+        # Pieces off board information section
+        if is_compact_layout:
+            # For very small screens, show a simplified view
+            pieces_y = red_bar_y + bar_height + spacing_unit
+            pieces_title = self.FONTS["SMALL"].render(
+                "AVAILABLE PIECES", True, self.COLORS["TEXT_DARK"]
+            )
+        else:
+            pieces_y = red_bar_y + bar_height + spacing_unit * 2
+            pieces_title = self.FONTS["NORMAL"].render(
+                "PIECES AVAILABLE", True, self.COLORS["TEXT_DARK"]
+            )
+            
+        pieces_rect = pieces_title.get_rect(centerx=sidebar_center_x, y=pieces_y)
         self.screen.blit(pieces_title, pieces_rect)
 
-        # Draw piece counts with visual indicators
+        # Get piece counts
         black_pieces = self.current_game_state.pieces_off_board[PlayerColor.BLACK]
         red_pieces = self.current_game_state.pieces_off_board[PlayerColor.RED]
 
-        # Black pieces
-        black_pieces_y = pieces_y + 40
+        # Adjust piece radius based on sidebar width for small screens
+        display_radius = min(self.PIECE_RADIUS, int(self.SIDEBAR_WIDTH * 0.1))
+        display_radius = max(display_radius, 10)  # Ensure minimum visibility
+        
+        # Calculate spacing between pieces
+        piece_spacing = max(5, min(10, int(self.SIDEBAR_WIDTH * 0.025)))
+        
+        # Black pieces - centered in sidebar
+        black_pieces_y = pieces_rect.bottom + spacing_unit
+        
+        # Calculate total width needed for pieces
+        pieces_total_width = 4 * (display_radius * 2 + piece_spacing)
+        pieces_start_x = sidebar_center_x - pieces_total_width // 2 + display_radius
+        
         for i in range(4):
-            piece_x = bar_x + i * (self.PIECE_RADIUS * 2 + 10)
+            piece_x = pieces_start_x + i * (display_radius * 2 + piece_spacing)
             piece_y = black_pieces_y
 
             if i < black_pieces:
@@ -411,30 +528,32 @@ class KulibratGUI(GameInterface):
                 pygame.draw.circle(
                     self.screen,
                     self.COLORS["BLACK_PIECE"],
-                    (piece_x + self.PIECE_RADIUS, piece_y + self.PIECE_RADIUS),
-                    self.PIECE_RADIUS,
+                    (piece_x, piece_y),
+                    display_radius,
                 )
             else:
                 # Used piece (outline only)
                 pygame.draw.circle(
                     self.screen,
                     self.COLORS["BLACK_PIECE"],
-                    (piece_x + self.PIECE_RADIUS, piece_y + self.PIECE_RADIUS),
-                    self.PIECE_RADIUS,
+                    (piece_x, piece_y),
+                    display_radius,
                     2,
                 )
 
-        black_pieces_label = self.FONTS["SMALL"].render(
-            f"BLACK: {black_pieces} available", True, self.COLORS["BLACK_SCORE"]
-        )
-        self.screen.blit(
-            black_pieces_label, (bar_x, black_pieces_y + self.PIECE_RADIUS * 2 + 5)
-        )
+        # Only show labels if there's enough space
+        if not is_compact_layout:
+            black_pieces_label = self.FONTS["SMALL"].render(
+                f"BLACK: {black_pieces}", True, self.COLORS["BLACK_SCORE"]
+            )
+            label_rect = black_pieces_label.get_rect(centerx=sidebar_center_x, y=black_pieces_y + display_radius + 5)
+            self.screen.blit(black_pieces_label, label_rect)
 
-        # Red pieces
-        red_pieces_y = black_pieces_y + self.PIECE_RADIUS * 2 + 30
+        # Red pieces with adaptive spacing
+        red_pieces_y = black_pieces_y + display_radius * 2 + spacing_unit
+        
         for i in range(4):
-            piece_x = bar_x + i * (self.PIECE_RADIUS * 2 + 10)
+            piece_x = pieces_start_x + i * (display_radius * 2 + piece_spacing)
             piece_y = red_pieces_y
 
             if i < red_pieces:
@@ -442,66 +561,72 @@ class KulibratGUI(GameInterface):
                 pygame.draw.circle(
                     self.screen,
                     self.COLORS["RED_PIECE"],
-                    (piece_x + self.PIECE_RADIUS, piece_y + self.PIECE_RADIUS),
-                    self.PIECE_RADIUS,
+                    (piece_x, piece_y),
+                    display_radius,
                 )
             else:
                 # Used piece (outline only)
                 pygame.draw.circle(
                     self.screen,
                     self.COLORS["RED_PIECE"],
-                    (piece_x + self.PIECE_RADIUS, piece_y + self.PIECE_RADIUS),
-                    self.PIECE_RADIUS,
+                    (piece_x, piece_y),
+                    display_radius,
                     2,
                 )
 
-        red_pieces_label = self.FONTS["SMALL"].render(
-            f"RED: {red_pieces} available", True, self.COLORS["RED_SCORE"]
-        )
-        self.screen.blit(
-            red_pieces_label, (bar_x, red_pieces_y + self.PIECE_RADIUS * 2 + 5)
-        )
+        if not is_compact_layout:
+            red_pieces_label = self.FONTS["SMALL"].render(
+                f"RED: {red_pieces}", True, self.COLORS["RED_SCORE"]
+            )
+            label_rect = red_pieces_label.get_rect(centerx=sidebar_center_x, y=red_pieces_y + display_radius + 5)
+            self.screen.blit(red_pieces_label, label_rect)
 
-        # Game statistics section
-        stats_y = red_pieces_y + self.PIECE_RADIUS * 2 + 50
-        stats_title = self.FONTS["NORMAL"].render(
-            "GAME STATISTICS", True, self.COLORS["TEXT_DARK"]
-        )
-        stats_rect = stats_title.get_rect(
-            centerx=sidebar_x + self.SIDEBAR_WIDTH // 2, y=stats_y
-        )
-        self.screen.blit(stats_title, stats_rect)
+        # Game statistics section - only show if there's space
+        # For very small screens, skip statistics to save space
+        if not is_compact_layout:
+            stats_y = red_pieces_y + display_radius * 2 + spacing_unit * 2
+            stats_title = self.FONTS["NORMAL"].render(
+                "GAME STATISTICS", True, self.COLORS["TEXT_DARK"]
+            )
+            stats_rect = stats_title.get_rect(centerx=sidebar_center_x, y=stats_y)
+            self.screen.blit(stats_title, stats_rect)
 
-        # Display turn count and move types
-        turn_label = self.FONTS["SMALL"].render(
-            f"Turn: {self.statistics.total_turns + 1}", True, self.COLORS["TEXT_DARK"]
-        )
-        self.screen.blit(turn_label, (bar_x, stats_y + 40))
-
-        # Display move counts for each player
-        black_moves = self.statistics.moves_by_player[PlayerColor.BLACK]
-        red_moves = self.statistics.moves_by_player[PlayerColor.RED]
-
-        move_label_black = self.FONTS["SMALL"].render(
-            f"Black Moves: {black_moves}", True, self.COLORS["BLACK_SCORE"]
-        )
-        move_label_red = self.FONTS["SMALL"].render(
-            f"Red Moves: {red_moves}", True, self.COLORS["RED_SCORE"]
-        )
-
-        self.screen.blit(move_label_black, (bar_x, stats_y + 70))
-        self.screen.blit(move_label_red, (bar_x, stats_y + 100))
-
-        # Rules and help button at the bottom of sidebar
-        help_y = self.SCREEN_HEIGHT - 100
-        help_button = pygame.Rect(bar_x, help_y, bar_width, 40)
+            # Counters for players
+            black_moves = self.statistics.moves_by_player[PlayerColor.BLACK]
+            red_moves = self.statistics.moves_by_player[PlayerColor.RED]
+            
+            # Compact display for statistics
+            stats_y = stats_rect.bottom + spacing_unit
+            stats_text = f"Turn: {self.statistics.total_turns + 1}  •  Moves: B:{black_moves} R:{red_moves}"
+            stats_label = self.FONTS["SMALL"].render(stats_text, True, self.COLORS["TEXT_DARK"])
+            stats_rect = stats_label.get_rect(centerx=sidebar_center_x, y=stats_y)
+            self.screen.blit(stats_label, stats_rect)
+        
+        # Help button at the bottom of sidebar - always show
+        # Calculate position to ensure it's always visible at the bottom
+        button_height = max(30, int(spacing_unit * 1.5))
+        help_y = self.SCREEN_HEIGHT - button_height - spacing_unit
+        
+        # Size button based on available width
+        button_width = min(bar_width, self.SIDEBAR_WIDTH - 20)
+        button_x = sidebar_center_x - button_width // 2
+        
+        help_button = pygame.Rect(button_x, help_y, button_width, button_height)
         pygame.draw.rect(
             self.screen, self.COLORS["BUTTON"], help_button, border_radius=5
         )
 
+        # Scale button text to fit
         help_text = self.FONTS["NORMAL"].render(
             "Game Rules", True, self.COLORS["BUTTON_TEXT"]
         )
+        
+        # If text is too wide, use smaller font
+        if help_text.get_width() > button_width - 10:
+            help_text = self.FONTS["SMALL"].render(
+                "Game Rules", True, self.COLORS["BUTTON_TEXT"]
+            )
+            
         help_rect = help_text.get_rect(center=help_button.center)
         self.screen.blit(help_text, help_rect)
 
@@ -509,23 +634,57 @@ class KulibratGUI(GameInterface):
         self.buttons = [("help", help_button)]
 
     def _draw_message(self):
-        """Display temporary messages to the user."""
+        """Display temporary messages to the user with responsive sizing."""
         if not self.message:
             return
 
+        # Calculate message bar height based on screen dimensions
+        # Ensure it's visible but not too large on small screens
+        message_height = min(int(self.SCREEN_HEIGHT * 0.1), 80)
+        message_height = max(message_height, 40)  # Ensure minimum height
+
         # Create semi-transparent overlay
-        message_surface = pygame.Surface((self.SCREEN_WIDTH, 80), pygame.SRCALPHA)
+        message_surface = pygame.Surface((self.SCREEN_WIDTH, message_height), pygame.SRCALPHA)
         message_surface.fill((50, 50, 50, 200))
 
+        # Render message text with appropriate font size
+        # Choose font size based on message bar size
+        if message_height < 50:
+            font = self.FONTS["SMALL"]
+        else:
+            font = self.FONTS["NORMAL"]
+            
         # Render message text
-        message_text = self.FONTS["NORMAL"].render(self.message, True, (255, 255, 255))
+        message_text = font.render(self.message, True, (255, 255, 255))
+        
+        # Check if message is too wide for the screen
+        if message_text.get_width() > self.SCREEN_WIDTH - 20:
+            # Use smaller font or truncate on very small screens
+            if message_height < 40:
+                # Severely constrained space - abbreviate message
+                words = self.message.split()
+                if len(words) > 4:
+                    abbreviated = " ".join(words[:3]) + "..."
+                    message_text = self.FONTS["TINY"].render(abbreviated, True, (255, 255, 255))
+                else:
+                    # Just use smallest font
+                    message_text = self.FONTS["TINY"].render(self.message, True, (255, 255, 255))
+            else:
+                # Try with smaller font
+                message_text = self.FONTS["SMALL"].render(self.message, True, (255, 255, 255))
+                
+                # If still too wide, abbreviate
+                if message_text.get_width() > self.SCREEN_WIDTH - 20:
+                    message_text = self.FONTS["TINY"].render(self.message, True, (255, 255, 255))
+        
+        # Center the text in the message bar
         text_rect = message_text.get_rect(
             center=(message_surface.get_width() // 2, message_surface.get_height() // 2)
         )
         message_surface.blit(message_text, text_rect)
 
         # Position at bottom of screen
-        self.screen.blit(message_surface, (0, self.SCREEN_HEIGHT - 80))
+        self.screen.blit(message_surface, (0, self.SCREEN_HEIGHT - message_height))
 
     def _process_animations(self):
         """Process and render any active animations."""

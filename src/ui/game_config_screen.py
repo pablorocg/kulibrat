@@ -37,34 +37,51 @@ class GameConfigScreen:
             'RL_COLOR': (220, 150, 50),
         }
         
-        # Font setup
+        # Font setup with responsive sizing
         pygame.font.init()
+        
+        # Calculate font sizes based on screen dimensions
+        # This ensures text scales appropriately on different screen sizes
+        font_size_factor = min(self.screen_width / 1024, self.screen_height / 768)
+        
+        # Ensure minimum readable sizes and maximum sizes for very large screens
+        def responsive_size(base_size):
+            size = int(base_size * font_size_factor)
+            return max(10, min(size, base_size * 2))  # Min 10px, max 2x original size
+        
+        # Apply responsive font sizes
+        title_size = responsive_size(48)
+        header_size = responsive_size(32)
+        normal_size = responsive_size(24)
+        small_size = responsive_size(18)
+        tiny_size = responsive_size(14)
+        
         try:
             font_path = os.path.join("src", "ui", "assets", "fonts", "Roboto-Regular.ttf")
             if os.path.exists(font_path):
                 self.FONTS = {
-                    'TITLE': pygame.font.Font(font_path, 48),
-                    'HEADER': pygame.font.Font(font_path, 32),
-                    'NORMAL': pygame.font.Font(font_path, 24),
-                    'SMALL': pygame.font.Font(font_path, 18),
-                    'TINY': pygame.font.Font(font_path, 14)
+                    'TITLE': pygame.font.Font(font_path, title_size),
+                    'HEADER': pygame.font.Font(font_path, header_size),
+                    'NORMAL': pygame.font.Font(font_path, normal_size),
+                    'SMALL': pygame.font.Font(font_path, small_size),
+                    'TINY': pygame.font.Font(font_path, tiny_size)
                 }
             else:
                 self.FONTS = {
-                    'TITLE': pygame.font.SysFont('Arial', 48),
-                    'HEADER': pygame.font.SysFont('Arial', 32),
-                    'NORMAL': pygame.font.SysFont('Arial', 24),
-                    'SMALL': pygame.font.SysFont('Arial', 18),
-                    'TINY': pygame.font.SysFont('Arial', 14)
+                    'TITLE': pygame.font.SysFont('Arial', title_size),
+                    'HEADER': pygame.font.SysFont('Arial', header_size),
+                    'NORMAL': pygame.font.SysFont('Arial', normal_size),
+                    'SMALL': pygame.font.SysFont('Arial', small_size),
+                    'TINY': pygame.font.SysFont('Arial', tiny_size)
                 }
         except:
             # Fallback to system fonts if custom font fails
             self.FONTS = {
-                'TITLE': pygame.font.SysFont('Arial', 48),
-                'HEADER': pygame.font.SysFont('Arial', 32),
-                'NORMAL': pygame.font.SysFont('Arial', 24),
-                'SMALL': pygame.font.SysFont('Arial', 18),
-                'TINY': pygame.font.SysFont('Arial', 14)
+                'TITLE': pygame.font.SysFont('Arial', title_size),
+                'HEADER': pygame.font.SysFont('Arial', header_size),
+                'NORMAL': pygame.font.SysFont('Arial', normal_size),
+                'SMALL': pygame.font.SysFont('Arial', small_size),
+                'TINY': pygame.font.SysFont('Arial', tiny_size)
             }
         
         # Player configuration options
@@ -289,7 +306,7 @@ class GameConfigScreen:
         return self.config
     
     def _setup_ui_elements(self):
-        """Set up all UI elements for the configuration screen."""
+        """Set up all UI elements for the configuration screen with enhanced responsiveness."""
         # Reset all UI elements
         self.buttons = []
         self.dropdowns = []
@@ -297,19 +314,57 @@ class GameConfigScreen:
         self.sliders = []
         self.checkboxes = []
         
-        # Calculate responsive layout positions
-        panel_width = min(800, self.screen_width - 40)
-        panel_height = min(600, self.screen_height - 40)
+        # Get screen aspect ratio to optimize layout
+        aspect_ratio = self.screen_width / self.screen_height
+        
+        # Calculate responsive layout positions based on screen size and aspect ratio
+        # Handle different screen dimensions and orientations
+        if aspect_ratio < 1.0:  # Portrait orientation (mobile screens)
+            # Use more vertical layout for portrait orientation
+            panel_width = min(int(self.screen_width * 0.95), 800)
+            panel_height = min(int(self.screen_height * 0.85), 800)
+        elif self.screen_width < 800 or self.screen_height < 600:  # Small screens
+            # For small screens, use larger percentage of available space
+            panel_width = min(int(self.screen_width * 0.9), 800)
+            panel_height = min(int(self.screen_height * 0.9), 600)
+        else:  # Normal and large screens
+            # Standard layout with fixed maximum size
+            panel_width = min(800, self.screen_width - 80)
+            panel_height = min(600, self.screen_height - 80)
+        
+        # Center the panel on screen
         panel_x = (self.screen_width - panel_width) // 2
         panel_y = (self.screen_height - panel_height) // 2
         
-        column_width = (panel_width - 60) // 2
+        # Adjust column width for very narrow screens
+        if panel_width < 500:
+            # For narrow screens, use single column layout by making each column full width
+            column_width = panel_width - 40
+        else:
+            # For wider screens, use two-column layout
+            column_width = (panel_width - 60) // 2
         
         # Create the main panel
         self.panel_rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
         
-        # Player 1 (BLACK) configuration - Left column
-        y_pos = panel_y + 100
+        # Determine if we should use single-column or two-column layout
+        # For narrow screens, stack the player configurations vertically
+        use_single_column = panel_width < 500
+        
+        # Determine element height based on screen size for better touch interaction
+        element_height = max(40, int(min(self.screen_height, self.screen_width) * 0.06))
+        
+        # Determine spacing between elements based on panel height
+        spacing = max(30, int(panel_height * 0.05))
+        
+        # Title spacing - adjust for smaller screens
+        title_spacing = int(panel_height * 0.12)  # Space for the title area
+        
+        # Starting Y position after title
+        y_pos = panel_y + title_spacing
+        
+        # Player 1 (BLACK) configuration
+        black_header_y = y_pos
         
         # Player 1 name input
         self.input_fields.append({
@@ -317,10 +372,10 @@ class GameConfigScreen:
             "type": "input",
             "label": "Black Player Name",
             "value": self.config["black_player"]["name"],
-            "rect": pygame.Rect(panel_x + 30, y_pos, column_width, 40)
+            "rect": pygame.Rect(panel_x + 30, y_pos, column_width, element_height)
         })
         
-        y_pos += 60
+        y_pos += spacing
         
         # Player 1 type dropdown
         self.dropdowns.append({
@@ -328,34 +383,68 @@ class GameConfigScreen:
             "label": "Player Type",
             "value": self.config["black_player"]["type"],
             "options": self.player_types,
-            "rect": pygame.Rect(panel_x + 30, y_pos, column_width, 40)
+            "rect": pygame.Rect(panel_x + 30, y_pos, column_width, element_height)
         })
         
-        # Player 2 (RED) configuration - Right column
-        y_pos = panel_y + 100
+        if use_single_column:
+            # In single column mode, continue adding elements below
+            y_pos += spacing * 1.5  # Add extra spacing between player sections
+            red_header_y = y_pos
+            
+            # Player 2 name input
+            self.input_fields.append({
+                "id": "red_player_name",
+                "type": "input",
+                "label": "Red Player Name",
+                "value": self.config["red_player"]["name"],
+                "rect": pygame.Rect(panel_x + 30, y_pos, column_width, element_height)
+            })
+            
+            y_pos += spacing
+            
+            # Player 2 type dropdown
+            self.dropdowns.append({
+                "id": "red_player_type",
+                "label": "Player Type",
+                "value": self.config["red_player"]["type"],
+                "options": self.player_types,
+                "rect": pygame.Rect(panel_x + 30, y_pos, column_width, element_height)
+            })
+        else:
+            # In two-column mode, place Player 2 on the right
+            # Player 2 (RED) configuration - Right column
+            red_header_y = black_header_y  # Same level as black header
+            right_column_x = panel_x + panel_width - column_width - 30
+            
+            # Player 2 name input
+            self.input_fields.append({
+                "id": "red_player_name",
+                "type": "input",
+                "label": "Red Player Name",
+                "value": self.config["red_player"]["name"],
+                "rect": pygame.Rect(right_column_x, black_header_y, column_width, element_height)
+            })
+            
+            # Player 2 type dropdown (align with black dropdown)
+            self.dropdowns.append({
+                "id": "red_player_type",
+                "label": "Player Type",
+                "value": self.config["red_player"]["type"],
+                "options": self.player_types,
+                "rect": pygame.Rect(right_column_x, black_header_y + spacing, column_width, element_height)
+            })
         
-        # Player 2 name input
-        self.input_fields.append({
-            "id": "red_player_name",
-            "type": "input",
-            "label": "Red Player Name",
-            "value": self.config["red_player"]["name"],
-            "rect": pygame.Rect(panel_x + panel_width - column_width - 30, y_pos, column_width, 40)
-        })
+        # Track the next Y position for game settings
+        if use_single_column:
+            # In single column, continue from the last element
+            settings_y = y_pos + spacing * 1.5  # Add extra spacing after player configs
+        else:
+            # In two columns, start after the player configuration section
+            settings_y = black_header_y + spacing * 2.5
         
-        y_pos += 60
-        
-        # Player 2 type dropdown
-        self.dropdowns.append({
-            "id": "red_player_type",
-            "label": "Player Type",
-            "value": self.config["red_player"]["type"],
-            "options": self.player_types,
-            "rect": pygame.Rect(panel_x + panel_width - column_width - 30, y_pos, column_width, 40)
-        })
-        
-        # Game settings section - center section
-        settings_y = panel_y + 240
+        # Game settings section
+        # Set slider height based on screen size
+        slider_height = max(20, int(element_height * 0.5))
         
         # Target score slider
         self.sliders.append({
@@ -365,10 +454,10 @@ class GameConfigScreen:
             "min": 1,
             "max": 10,
             "step": 1,
-            "rect": pygame.Rect(panel_x + 30, settings_y, panel_width - 60, 20)
+            "rect": pygame.Rect(panel_x + 30, settings_y, column_width if use_single_column else panel_width - 60, slider_height)
         })
         
-        settings_y += 60
+        settings_y += spacing
         
         # AI delay slider
         self.sliders.append({
@@ -378,46 +467,120 @@ class GameConfigScreen:
             "min": 0.0,
             "max": 2.0,
             "step": 0.1,
-            "rect": pygame.Rect(panel_x + 30, settings_y, panel_width - 60, 20)
+            "rect": pygame.Rect(panel_x + 30, settings_y, column_width if use_single_column else panel_width - 60, slider_height)
         })
         
-        settings_y += 60
+        settings_y += spacing
         
-        # RL model path input
-        self.input_fields.append({
-            "id": "rl_model_path",
-            "type": "input",
-            "label": "RL Model Path (for RL players)",
-            "value": self.config["rl_model_path"],
-            "rect": pygame.Rect(panel_x + 30, settings_y, panel_width - 60, 40)
-        })
+        # Make checkbox size responsive
+        checkbox_size = max(18, int(element_height * 0.6))
         
-        settings_y += 70
+        # RL model path input - skip on very small screens to save space
+        if self.screen_height >= 500:
+            self.input_fields.append({
+                "id": "rl_model_path",
+                "type": "input",
+                "label": "RL Model Path (for RL players)",
+                "value": self.config["rl_model_path"],
+                "rect": pygame.Rect(panel_x + 30, settings_y, column_width if use_single_column else panel_width - 60, element_height)
+            })
+            
+            settings_y += spacing
         
         # Fullscreen checkbox
         self.checkboxes.append({
             "id": "fullscreen",
             "label": "Fullscreen Mode",
             "value": self.config["fullscreen"],
-            "rect": pygame.Rect(panel_x + 30, settings_y, 24, 24)
+            "rect": pygame.Rect(panel_x + 30, settings_y, checkbox_size, checkbox_size)
         })
         
-        # Buttons at the bottom
-        buttons_y = panel_y + panel_height - 70
+        # Calculate button sizes and positions based on screen size
+        button_height = max(40, int(element_height * 1.2))
+        button_width = max(150, int(column_width * 0.8))
+        button_spacing = int(panel_width * 0.05)
         
-        # Toggle fullscreen button
-        self.buttons.append({
-            "id": "toggle_fullscreen",
-            "label": "Toggle Fullscreen",
-            "rect": pygame.Rect(panel_x + 30, buttons_y, 200, 50)
-        })
+        # Buttons at the bottom - use responsive positioning
+        # Reserve space at bottom based on screen size
+        bottom_margin = max(20, int(panel_height * 0.05))
+        buttons_y = panel_y + panel_height - button_height - bottom_margin
         
-        # Start game button
-        self.buttons.append({
-            "id": "start_game",
-            "label": "Start Game",
-            "rect": pygame.Rect(panel_x + panel_width - 230, buttons_y, 200, 50)
-        })
+        if use_single_column:
+            # For single column layout, stack buttons if panel is too narrow
+            if panel_width < 350:
+                # Toggle fullscreen button on top
+                self.buttons.append({
+                    "id": "toggle_fullscreen",
+                    "label": "Toggle Fullscreen",
+                    "rect": pygame.Rect(
+                        panel_x + (panel_width - button_width) // 2,  # Center horizontally
+                        buttons_y - button_height - 10,  # Position above start button
+                        button_width, 
+                        button_height
+                    )
+                })
+                
+                # Start game button at bottom
+                self.buttons.append({
+                    "id": "start_game",
+                    "label": "Start Game",
+                    "rect": pygame.Rect(
+                        panel_x + (panel_width - button_width) // 2,  # Center horizontally
+                        buttons_y,
+                        button_width,
+                        button_height
+                    )
+                })
+            else:
+                # Side by side buttons for wider panels in single column mode
+                # Toggle fullscreen button on left
+                self.buttons.append({
+                    "id": "toggle_fullscreen",
+                    "label": "Toggle Fullscreen",
+                    "rect": pygame.Rect(
+                        panel_x + 30,
+                        buttons_y,
+                        button_width,
+                        button_height
+                    )
+                })
+                
+                # Start game button on right
+                self.buttons.append({
+                    "id": "start_game",
+                    "label": "Start Game",
+                    "rect": pygame.Rect(
+                        panel_x + panel_width - button_width - 30,
+                        buttons_y,
+                        button_width,
+                        button_height
+                    )
+                })
+        else:
+            # Two column layout - standard button placement
+            # Toggle fullscreen button
+            self.buttons.append({
+                "id": "toggle_fullscreen",
+                "label": "Toggle Fullscreen",
+                "rect": pygame.Rect(
+                    panel_x + 30,
+                    buttons_y,
+                    button_width,
+                    button_height
+                )
+            })
+            
+            # Start game button
+            self.buttons.append({
+                "id": "start_game",
+                "label": "Start Game",
+                "rect": pygame.Rect(
+                    panel_x + panel_width - button_width - 30,
+                    buttons_y,
+                    button_width,
+                    button_height
+                )
+            })
     
     def _draw(self, screen: pygame.Surface):
         """Draw the configuration screen."""
