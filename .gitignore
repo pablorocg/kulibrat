@@ -8,3 +8,4 @@ __pycache__/*
 # rl_player.py
 *.pyc
 models/*
+src/ui/__pycache__/__init__.cpython-310.pyc

@@ -2,37 +2,46 @@
 """
 Main entry point for the Kulibrat game.
 
-This script allows playing Kulibrat with different game modes:
-- Human vs Human: Two players at the same computer
-- Human vs AI: Play against an AI opponent
-- AI vs AI: Watch two AI players compete
+This script initializes and runs the Kulibrat game with different modes and configurations.
 
 Run this file from the project root:
 python main.py
 
 Command line options:
---mode: Game mode (human-vs-human, human-vs-ai, ai-vs-ai)
+--mode: Game mode (human-vs-human, human-vs-ai, ai-vs-ai, human-vs-rl, rl-vs-ai)
 --target-score: Score needed to win the game (default: 5)
 --ai-algorithm: AI algorithm to use (random, minimax)
---ai-delay: Delay between AI moves in seconds (default: 0.5)
+--delay: Delay between AI moves in seconds (default: 0.5)
+--rl-model: Path to the trained RL model file
 """
 
+import sys
+import os
 import argparse
 import time
 from typing import Dict, Any
 
+# Add the project root to the Python path to make imports work correctly
+project_root = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, project_root)
+
 # Import core components
 from src.core.player_color import PlayerColor
-# from src.core.game_state import GameState
+from src.core.game_state import GameState
 from src.core.game_engine import GameEngine
 
 # Import player implementations
+from src.players.player import Player
 from src.players.human_player import HumanPlayer
+from src.players.ai.ai_player import AIPlayer
 from src.players.ai.simple_ai_player import SimpleAIPlayer
+from src.players.ai.ai_strategy import AIStrategy
 from src.players.ai.random_strategy import RandomStrategy
 from src.players.ai.minimax_strategy import MinimaxStrategy
+from src.players.ai.rl_player import RLPlayer  # Import the RL player
 
 # Import UI components
+from src.ui.game_interface import GameInterface
 from src.ui.console_interface import ConsoleInterface
 from src.ui.pygame_interface import KulibratGUI
 
@@ -45,20 +54,20 @@ def setup_game_options() -> Dict[str, Any]:
         Dictionary of game options
     """
     parser = argparse.ArgumentParser(description="Kulibrat Game")
-
-    # Añade una opción para seleccionar la interfaz
+    
+    # Add interface selection option
     parser.add_argument(
         "--interface", 
         choices=["console", "pygame"],
         default="console",
-        help="Choose game interface"
+        help="Choose game interface (console or pygame)"
     )
     
     parser.add_argument(
         "--mode", 
-        choices=["human-vs-human", "human-vs-ai", "ai-vs-ai"], 
-        default="human-vs-human",
-        help="Game mode (human-vs-human, human-vs-ai, ai-vs-ai)"
+        choices=["human-vs-human", "human-vs-ai", "ai-vs-ai", "human-vs-rl", "rl-vs-ai"], 
+        default="human-vs-ai",
+        help="Game mode (human-vs-human, human-vs-ai, ai-vs-ai, human-vs-rl, rl-vs-ai)"
     )
     
     parser.add_argument(
@@ -89,6 +98,34 @@ def setup_game_options() -> Dict[str, Any]:
         help="Color for the AI player in human-vs-ai mode"
     )
     
+    parser.add_argument(
+        "--rl-model",
+        type=str,
+        default="models/kulibrat_rl_model_best.pt",
+        help="Path to the trained RL model file"
+    )
+    
+    parser.add_argument(
+        "--rl-color",
+        choices=["black", "red"],
+        default="red",
+        help="Color for the RL player in human-vs-rl mode"
+    )
+    
+    parser.add_argument(
+        "--rl-exploration",
+        type=float,
+        default=0.0,
+        help="Exploration rate for RL player (0.0 for deterministic play)"
+    )
+    
+    parser.add_argument(
+        "--rl-temperature",
+        type=float,
+        default=0.1,
+        help="Temperature for RL policy sampling (lower for stronger play)"
+    )
+    
     return vars(parser.parse_args())
 
 
@@ -97,9 +134,14 @@ def main():
     # Setup game options
     options = setup_game_options()
     
-    # Create interface
+    # Create interface based on user selection
     if options["interface"] == "pygame":
-        interface = KulibratGUI()
+        try:
+            interface = KulibratGUI()
+            print("Using PyGame interface")
+        except ImportError:
+            print("PyGame not installed. Falling back to console interface.")
+            interface = ConsoleInterface()
     else:
         interface = ConsoleInterface()
     
@@ -109,10 +151,18 @@ def main():
     else:  # random
         ai_strategy = RandomStrategy()
     
+    # Validate RL model path if using RL modes
+    if "rl" in options["mode"]:
+        if not os.path.exists(options["rl_model"]):
+            print(f"Error: RL model file '{options['rl_model']}' not found.")
+            print("You can train a model using train_rl_agent.py or specify a different model with --rl-model.")
+            return
+    
     # Create players based on selected mode
     if options["mode"] == "human-vs-human":
         black_player = HumanPlayer(PlayerColor.BLACK, interface)
         red_player = HumanPlayer(PlayerColor.RED, interface)
+    
     elif options["mode"] == "human-vs-ai":
         if options["ai_color"] == "black":
             black_player = SimpleAIPlayer(PlayerColor.BLACK, ai_strategy)
@@ -120,9 +170,42 @@ def main():
         else:  # AI is red
             black_player = HumanPlayer(PlayerColor.BLACK, interface)
             red_player = SimpleAIPlayer(PlayerColor.RED, ai_strategy)
-    else:  # ai-vs-ai
+    
+    elif options["mode"] == "ai-vs-ai":
         black_player = SimpleAIPlayer(PlayerColor.BLACK, ai_strategy)
-        red_player = SimpleAIPlayer(PlayerColor.RED, ai_strategy)#RandomStrategy()
+        red_player = SimpleAIPlayer(PlayerColor.RED, ai_strategy if options["ai_algorithm"] != "random" else RandomStrategy())
+    
+    elif options["mode"] == "human-vs-rl":
+        # RL player with the trained model
+        if options["rl_color"] == "black":
+            black_player = RLPlayer(
+                PlayerColor.BLACK, 
+                model_path=options["rl_model"],
+                exploration_rate=options["rl_exploration"],
+                temperature=options["rl_temperature"],
+                name="RL BLACK"
+            )
+            red_player = HumanPlayer(PlayerColor.RED, interface)
+        else:  # RL is red
+            black_player = HumanPlayer(PlayerColor.BLACK, interface)
+            red_player = RLPlayer(
+                PlayerColor.RED, 
+                model_path=options["rl_model"],
+                exploration_rate=options["rl_exploration"],
+                temperature=options["rl_temperature"],
+                name="RL RED"
+            )
+    
+    elif options["mode"] == "rl-vs-ai":
+        # RL player against AI player
+        black_player = RLPlayer(
+            PlayerColor.BLACK, 
+            model_path=options["rl_model"],
+            exploration_rate=options["rl_exploration"],
+            temperature=options["rl_temperature"],
+            name="RL BLACK"
+        )
+        red_player = SimpleAIPlayer(PlayerColor.RED, ai_strategy, name=f"AI RED ({options['ai_algorithm']})")
     
     # Create game engine
     engine = GameEngine(
@@ -133,35 +216,43 @@ def main():
         ai_delay=options["ai_delay"]
     )
     
-    # Welcome message
-    print("\n=== WELCOME TO KULIBRAT ===")
-    print(f"Game Mode: {options['mode']}")
-    print(f"Target Score: {options['target_score']}")
-    
-    if "ai" in options["mode"]:
-        print(f"AI Algorithm: {options['ai_algorithm']}")
-        print(f"AI Delay: {options['ai_delay']} seconds")
-    
-    print("\nStarting game...")
-    time.sleep(1)
+    # Welcome message (for console interface)
+    if options["interface"] == "console":
+        print("\n=== WELCOME TO KULIBRAT ===")
+        print(f"Game Mode: {options['mode']}")
+        print(f"Target Score: {options['target_score']}")
+        
+        if "ai" in options["mode"]:
+            print(f"AI Algorithm: {options['ai_algorithm']}")
+            print(f"AI Delay: {options['ai_delay']} seconds")
+        
+        if "rl" in options["mode"]:
+            print(f"RL Model: {options['rl_model']}")
+            print(f"RL Exploration Rate: {options['rl_exploration']}")
+            print(f"RL Temperature: {options['rl_temperature']}")
+        
+        print("\nStarting game...")
+        time.sleep(1)
     
     # Start the game
-    winner = engine.start_game()
-    
-    # Ask if the player wants to play again
-    play_again = input("\nDo you want to play again? (y/n): ").lower().startswith('y')
+    play_again = True
     
     while play_again:
-        # Reset the game
-        engine.reset_game()
-        
-        # Start a new game
         winner = engine.start_game()
         
-        # Ask if the player wants to play again
-        play_again = input("\nDo you want to play again? (y/n): ").lower().startswith('y')
+        # For console interface, ask if the player wants to play again
+        if options["interface"] == "console":
+            play_again = input("\nDo you want to play again? (y/n): ").lower().startswith('y')
+        else:
+            # For PyGame interface, the play_again logic is handled in the show_winner method
+            play_again = False
+            
+        if play_again:
+            # Reset the game
+            engine.reset_game()
     
-    print("\nThanks for playing Kulibrat!")
+    if options["interface"] == "console":
+        print("\nThanks for playing Kulibrat!")
 
 
 if __name__ == "__main__":

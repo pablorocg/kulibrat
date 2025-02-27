@@ -33,19 +33,23 @@ from src.ui.game_interface import GameInterface
 from src.ui.console_interface import GameStatistics
 from src.ui.enhanced_board_renderer import EnhancedBoardRenderer
 from src.ui.asset_manager import AssetManager
+from src.ui.game_config_screen import GameConfigScreen
 
 
 class KulibratGUI(GameInterface):
     """Enhanced graphical interface for the Kulibrat game with smooth animations."""
     
-    def __init__(self, screen_width=2000, screen_height=768):
+    def __init__(self, screen_width=1024, screen_height=768):
         """Initialize the GUI with responsive sizing."""
         pygame.init()
-        pygame.display.set_caption('Kulibrat - Strategic Board Game')
+        pygame.display.set_caption('Kulibrat')
         
         # Screen configuration
         self.SCREEN_WIDTH = screen_width
         self.SCREEN_HEIGHT = screen_height
+
+        # Check if fullscreen is requested in a config file or env variable
+        self.fullscreen = False
         self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT), pygame.HWSURFACE | pygame.DOUBLEBUF)
         
         # Color palette - modern and accessible
@@ -107,29 +111,67 @@ class KulibratGUI(GameInterface):
                 'TINY': pygame.font.SysFont('Arial', 14)
             }
         
-        # Layout calculations
-        self.BOARD_MARGIN_X = 40
-        self.BOARD_MARGIN_Y = 40
-        self.SIDEBAR_WIDTH = int(self.SCREEN_WIDTH * 0.3)
+        # Game configuration
+        self.game_config = {
+            "black_player": {
+                "name": "Player 1",
+                "type": "Human",
+                "color": "Black"
+            },
+            "red_player": {
+                "name": "Player 2", 
+                "type": "AI (Random)",
+                "color": "Red"
+            },
+            "target_score": 5,
+            "ai_delay": 0.5,
+            "fullscreen": False,
+            "rl_model_path": "models/kulibrat_rl_model_best.pt"
+        }
+        
+        # Show configuration screen first
+        self.config_screen = GameConfigScreen(self.SCREEN_WIDTH, self.SCREEN_HEIGHT)
+        self.game_config = self.config_screen.show(self.screen)
+        
+        # Apply fullscreen setting if requested
+        if self.game_config["fullscreen"] and not self.fullscreen:
+            self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+            self.SCREEN_WIDTH, self.SCREEN_HEIGHT = self.screen.get_size()
+            self.fullscreen = True
+        elif not self.game_config["fullscreen"] and self.fullscreen:
+            self.screen = pygame.display.set_mode((1024, 768), pygame.HWSURFACE | pygame.DOUBLEBUF)
+            self.SCREEN_WIDTH, self.SCREEN_HEIGHT = self.screen.get_size()
+            self.fullscreen = False
+        
+        # Layout calculations - updated for responsive design
+        self.BOARD_MARGIN_X = int(self.SCREEN_WIDTH * 0.03)  # Dynamic margins
+        self.BOARD_MARGIN_Y = int(self.SCREEN_HEIGHT * 0.05)
+        
+        # Responsive sidebar width based on screen dimensions
+        sidebar_ratio = 0.25 if self.SCREEN_WIDTH > 1200 else 0.3
+        self.SIDEBAR_WIDTH = int(self.SCREEN_WIDTH * sidebar_ratio)
         self.BOARD_AREA_WIDTH = self.SCREEN_WIDTH - self.SIDEBAR_WIDTH
         
         # Board dimensions
         self.BOARD_ROWS = 4
         self.BOARD_COLS = 3
         
-        # Calculate cell size based on available space
-        self.CELL_SIZE = min(
-            (self.BOARD_AREA_WIDTH - 2 * self.BOARD_MARGIN_X) // self.BOARD_COLS,
-            (self.SCREEN_HEIGHT - 2 * self.BOARD_MARGIN_Y) // self.BOARD_ROWS
+        # Calculate cell size based on available space - larger on bigger screens
+        max_area_width = min(
+            self.BOARD_AREA_WIDTH - 2 * self.BOARD_MARGIN_X,
+            self.SCREEN_HEIGHT - 2 * self.BOARD_MARGIN_Y * 1.2  # Slightly more vertical space
         )
         
-        # Board position
+        # Ensure board fits proportionally to the screen
+        self.CELL_SIZE = int(max_area_width / max(self.BOARD_COLS, self.BOARD_ROWS * 1.05))
+        
+        # Board position - centered in the available area
         self.BOARD_WIDTH = self.CELL_SIZE * self.BOARD_COLS
         self.BOARD_HEIGHT = self.CELL_SIZE * self.BOARD_ROWS
-        self.BOARD_X = (self.BOARD_AREA_WIDTH - self.BOARD_WIDTH) // 2
-        self.BOARD_Y = (self.SCREEN_HEIGHT - self.BOARD_HEIGHT) // 2
+        self.BOARD_X = int((self.BOARD_AREA_WIDTH - self.BOARD_WIDTH) / 2)
+        self.BOARD_Y = int((self.SCREEN_HEIGHT - self.BOARD_HEIGHT) / 2)
         
-        # Piece properties
+        # Piece properties - proportional to cell size
         self.PIECE_RADIUS = int(self.CELL_SIZE * 0.4)
         
         # Initialize enhanced board renderer
@@ -156,7 +198,7 @@ class KulibratGUI(GameInterface):
         
         # Game clock and timing
         self.clock = pygame.time.Clock()
-        self.FPS = 60
+        self.FPS = 25
         
         # Statistics tracking
         self.statistics = GameStatistics()
