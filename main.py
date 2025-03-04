@@ -19,7 +19,6 @@ Command line options:
 
 import argparse
 import os
-import sys
 import time
 from typing import Any, Dict
 
@@ -112,13 +111,13 @@ def create_player(player_type, player_color, interface, rl_model_path=None, play
     elif player_type == "minimax":
         return SimpleAIPlayer(
             color=player_color,
-            strategy=MinimaxStrategy(max_depth=5, use_alpha_beta=True),
+            strategy=MinimaxStrategy(max_depth=3, use_alpha_beta=True),
             name="Minimax",
         )
     elif player_type == "mcts":
         return SimpleAIPlayer(
             color=player_color,
-            strategy=MCTSStrategy(simulation_time=2, max_iterations=1e4),
+            strategy=MCTSStrategy(simulation_time=1, max_iterations=10000),
             name="MCTS",
         )
     elif player_type == "random":
@@ -251,7 +250,8 @@ def main():
             print(f"RL Model: {rl_model_2}")
 
         print("\nStarting game...")
-        time.sleep(1)
+        print("")
+        time.sleep(2)
 
     # Start the game
     play_again = True

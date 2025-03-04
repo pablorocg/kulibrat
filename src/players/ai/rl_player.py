@@ -35,6 +35,7 @@ class RLPlayer(AIPlayer):
             exploration_rate=exploration_rate,
             temperature=temperature
         )
+        self.model_path = model_path
         
         if name is None:
             name = f"RL {color.name}"
