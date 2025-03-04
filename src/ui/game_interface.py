@@ -60,3 +60,12 @@ class GameInterface(ABC):
             message: The message to display
         """
         pass
+
+    def set_players(self, players):
+        """
+        Set player references for the interface.
+        
+        Args:
+            players: Dictionary mapping player colors to player objects
+        """
+        pass  # Default implementation does nothing

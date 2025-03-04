@@ -14,15 +14,17 @@ from src.players.ai.ai_strategy import AIStrategy
 
 class RandomStrategy(AIStrategy):
     """Simple strategy that selects a random valid move."""
-    
-    def select_move(self, game_state: GameState, player_color: PlayerColor) -> Optional[Move]:
+
+    def select_move(
+        self, game_state: GameState, player_color: PlayerColor
+    ) -> Optional[Move]:
         """
         Select a random valid move.
-        
+
         Args:
             game_state: Current state of the game
             player_color: Color of the player making the move
-            
+
         Returns:
             A randomly selected valid move or None if no valid moves
         """

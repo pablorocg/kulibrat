@@ -11,3 +11,6 @@ models/*
 rules/rules.md
 *E.md
 
+# Log files
+*.log
+

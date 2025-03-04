@@ -4,6 +4,7 @@ Debugged version of the game engine that fixes the player turn issues.
 
 import time
 from typing import List, Optional
+import logging
 
 from src.core.game_state import GameState
 from src.core.move import Move
@@ -12,6 +13,10 @@ from src.players.player import Player
 from src.ui.console_interface import GameStatistics
 from src.ui.game_interface import GameInterface
 from src.core.move_type import MoveType
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class GameEngine:
@@ -32,14 +37,22 @@ class GameEngine:
         self.moves_history: List[Move] = []
         self.ai_delay = ai_delay
 
-        # CRITICAL FIX: Track current player explicitly, not relying on GameState
         self._current_player_color = PlayerColor.BLACK
+
+        # Provide player references to the interface if it supports it
+        if hasattr(interface, "set_players"):
+            interface.set_players(self.players)
 
     def start_game(self) -> Optional[PlayerColor]:
         """Start and play the game until completion."""
+
+        logger.info("Starting a new game")
+
         # Setup players
         for player in self.players.values():
             player.setup(self.state)
+
+        logger.info(f"Initial state: {self.state}")
 
         # Set initial player
         self._current_player_color = PlayerColor.BLACK
@@ -50,11 +63,24 @@ class GameEngine:
 
         # Main game loop
         while not self.state.is_game_over():
-            # Important: Force current player in GameState to match our tracking
+            logger.info(f"Starting turn for player {self._current_player_color}")
+
             self.state.current_player = self._current_player_color
 
             # Play turn for the current player
             self.play_one_turn()
+
+            # Log state after turn   # board, pieces_off_board, scores, current_player, target_score
+            logger.info(
+                f"""
+                State after {self._current_player_color}'s turn:
+                Board: {self.state.board.flatten()}
+                Pieces off board: {self.state.pieces_off_board}
+                Scores: {self.state.scores}
+                Current player: {self.state.current_player}
+                Target score: {self.state.target_score}
+                """
+            )
 
             # Switch to the other player after the turn
             self._current_player_color = self._current_player_color.opposite()
@@ -73,6 +99,8 @@ class GameEngine:
         # Notify players of game over
         for player in self.players.values():
             player.game_over(self.state)
+
+        logger.info(f"Game over. Winner: {winner}")
 
         return winner
 

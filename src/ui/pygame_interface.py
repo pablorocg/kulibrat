@@ -328,15 +328,66 @@ class KulibratGUI(GameInterface):
         sidebar_center_x = sidebar_x + self.SIDEBAR_WIDTH // 2
         
         # Calculate responsive spacing based on screen height
-        # This ensures elements are properly spaced regardless of screen size
-        spacing_factor = self.SCREEN_HEIGHT / 768  # Base on standard height
+        spacing_factor = self.SCREEN_HEIGHT / 768
         spacing_unit = int(25 * spacing_factor)
         
         # Calculate vertical positions relative to screen height
-        # Use relative percentages rather than fixed pixel values
-        title_y = int(self.SCREEN_HEIGHT * 0.05)  # 5% from top
+        title_y = int(self.SCREEN_HEIGHT * 0.05)
         player_y = title_y + spacing_unit * 3
-        score_section_y = player_y + spacing_unit * 3
+        
+        # Game title with scaled positioning
+        title = self.FONTS["TITLE"].render(
+            "KULIBRAT", True, self.COLORS["PANEL_HEADER"]
+        )
+        title_rect = title.get_rect(centerx=sidebar_center_x, y=title_y)
+        self.screen.blit(title, title_rect)
+
+        # Current player indicator
+        current_player = self.current_game_state.current_player
+        player_color = (
+            self.COLORS["BLACK_PIECE"]
+            if current_player == PlayerColor.BLACK
+            else self.COLORS["RED_PIECE"]
+        )
+
+        player_text = self.FONTS["HEADER"].render(
+            f"{current_player.name}'s Turn", True, player_color
+        )
+        player_rect = player_text.get_rect(
+            centerx=sidebar_center_x, y=player_y
+        )
+        self.screen.blit(player_text, player_rect)
+        
+        # Add player name and type below the current player indicator
+        # Get player info from the engine
+        player_obj = self.players.get(current_player)
+        if player_obj:
+            player_name = player_obj.name
+            player_type = "Human"
+            
+            # Determine player type based on the player class
+            if "AI" in player_name:
+                # Extract AI type from name if available
+                if "(" in player_name and ")" in player_name:
+                    player_type = player_name[player_name.find("(")+1:player_name.find(")")]
+                else:
+                    player_type = "AI"
+            elif "RL" in player_name:
+                player_type = "RL Model"
+            
+            player_info = self.FONTS["SMALL"].render(
+                f"{player_name} ({player_type})", True, player_color
+            )
+            player_info_rect = player_info.get_rect(
+                centerx=sidebar_center_x, y=player_rect.bottom + spacing_unit
+            )
+            self.screen.blit(player_info, player_info_rect)
+            
+            # Adjust the next section's starting position
+            score_section_y = player_info_rect.bottom + spacing_unit * 2
+        else:
+            # Fallback if player object isn't available
+            score_section_y = player_rect.bottom + spacing_unit * 3
         
         # Game title with scaled positioning
         title = self.FONTS["TITLE"].render(
@@ -1316,3 +1367,14 @@ class KulibratGUI(GameInterface):
                 self.clock.tick(60)
 
             return
+        
+
+    # In src/ui/pygame_interface.py
+    def set_players(self, players):
+        """
+        Set player references for the interface to access player information.
+        
+        Args:
+            players: Dictionary mapping player colors to player objects
+        """
+        self.players = players

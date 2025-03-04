@@ -1,8 +1,8 @@
 ## Kulibrat rules
 
-#### Thomas Bolander
+By Thomas Bolander
 
-#### April 15, 2019
+April 15, 2019
 
 ### 1 Introduction to the game
 

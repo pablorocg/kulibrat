@@ -119,7 +119,7 @@ class MCTSStrategy(AIStrategy):
     
     def __init__(self, 
                  simulation_time: float = 1.0, 
-                 max_iterations: int = 1000,
+                 max_iterations: int = 10000,
                  exploration_weight: float = 1.41):
         """
         Initialize the MCTS strategy.

@@ -2,11 +2,10 @@
 Minimax strategy implementation for Kulibrat AI.
 """
 
-import time
 import random
-from typing import Optional, Tuple, List, Dict, Any
+import time
+from typing import Optional, Tuple
 
-# Import from other modules
 from src.core.game_state import GameState
 from src.core.move import Move
 from src.core.player_color import PlayerColor
@@ -16,7 +15,7 @@ from src.players.ai.ai_strategy import AIStrategy
 class MinimaxStrategy(AIStrategy):
     """AI strategy using the minimax algorithm with optional alpha-beta pruning."""
 
-    def __init__(self, max_depth: int = 3, use_alpha_beta: bool = True):
+    def __init__(self, max_depth: int = 5, use_alpha_beta: bool = True):
         """
         Initialize the minimax strategy.
 
@@ -63,19 +62,19 @@ class MinimaxStrategy(AIStrategy):
             # Run minimax
             if self.use_alpha_beta:
                 score, _ = self._alpha_beta(
-                    next_state,
-                    self.max_depth - 1,
-                    float("-inf"),
-                    float("inf"),
-                    player_color.opposite(),
-                    player_color,
+                    state=next_state,
+                    depth=self.max_depth - 1,
+                    alpha=float("-inf"),
+                    beta=float("inf"),
+                    current_player=player_color.opposite(),
+                    maximizing_player=player_color,
                 )
             else:
                 score, _ = self._minimax(
-                    next_state,
-                    self.max_depth - 1,
-                    player_color.opposite(),
-                    player_color,
+                    state=next_state,
+                    depth=self.max_depth - 1,
+                    current_player=player_color.opposite(),
+                    maximizing_player=player_color,
                 )
 
             # Track best moves
@@ -264,7 +263,7 @@ class MinimaxStrategy(AIStrategy):
 
     def _evaluate(self, state: GameState, player_color: PlayerColor) -> float:
         """
-        Evaluate the state for the given player.
+        Heuristic: Evaluate the state for the given player.
 
         Args:
             state: Game state to evaluate
