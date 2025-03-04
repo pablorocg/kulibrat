@@ -117,7 +117,7 @@ def create_player(player_type, player_color, interface, rl_model_path=None, play
     elif player_type == "mcts":
         return SimpleAIPlayer(
             color=player_color,
-            strategy=MCTSStrategy(simulation_time=1, max_iterations=10000),
+            strategy=MCTSStrategy(simulation_time=3, max_iterations=10000),
             name="MCTS",
         )
     elif player_type == "random":

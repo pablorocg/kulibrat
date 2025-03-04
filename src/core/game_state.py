@@ -1,9 +1,10 @@
 """
-Game state representation for Kulibrat.
+Game state representation for Kulibrat, optimized for performance.
 """
 
 import numpy as np
-from typing import List, Optional, Tuple, Dict, Any
+from typing import List, Optional, Tuple, Dict, Set, FrozenSet, Any
+from functools import lru_cache
 
 from src.core.player_color import PlayerColor
 from src.core.move import Move
@@ -13,6 +14,19 @@ from src.core.move_type import MoveType
 class GameState:
     """Represents the complete state of a Kulibrat game."""
 
+    # Reusable constants
+    BOARD_ROWS = 4
+    BOARD_COLS = 3
+    
+    # Pre-calculate all valid board positions for faster lookup
+    VALID_POSITIONS = frozenset((r, c) for r in range(4) for c in range(3))
+    
+    # Pre-calculate diagonal offsets by player
+    DIAGONAL_OFFSETS = {
+        PlayerColor.BLACK: [(1, -1), (1, 1)],  # Down-left, Down-right
+        PlayerColor.RED: [(-1, -1), (-1, 1)]   # Up-left, Up-right
+    }
+
     def __init__(self, target_score: int = 5):
         """
         Initialize a new game state.
@@ -20,9 +34,10 @@ class GameState:
         Args:
             target_score: Score needed to win the game
         """
-        # Board is 3x4 (rows x columns)
+        # Board is 4x3 (rows x columns)
         # 0 = empty, 1 = black piece, -1 = red piece
-        self.board = np.zeros((4, 3), dtype=np.int8)
+        # Use int8 for memory efficiency
+        self.board = np.zeros((self.BOARD_ROWS, self.BOARD_COLS), dtype=np.int8)
 
         # Number of pieces available to be inserted (not on board)
         self.pieces_off_board = {PlayerColor.BLACK: 4, PlayerColor.RED: 4}
@@ -35,20 +50,24 @@ class GameState:
 
         # How many points to win
         self.target_score = target_score
+        
+        # Cache for valid moves
+        self._valid_moves_cache = {}
 
     def copy(self) -> "GameState":
         """Create a deep copy of the current game state."""
         new_state = GameState(self.target_score)
+        # NumPy copy is faster for small arrays than deepcopy
         new_state.board = self.board.copy()
+        # Dict copy is faster than deepcopy for small dicts
         new_state.pieces_off_board = self.pieces_off_board.copy()
         new_state.scores = self.scores.copy()
         new_state.current_player = self.current_player
         return new_state
 
     def is_valid_position(self, pos: Tuple[int, int]) -> bool:
-        """Check if a position is on the board."""
-        row, col = pos
-        return 0 <= row < 4 and 0 <= col < 3
+        """Check if a position is on the board using pre-calculated set."""
+        return pos in self.VALID_POSITIONS
 
     def is_empty(self, pos: Tuple[int, int]) -> bool:
         """Check if a board position is empty."""
@@ -63,50 +82,56 @@ class GameState:
         return self.board[row, col]
 
     def is_game_over(self) -> bool:
-        """Check if the game is over."""
-        # Check if any player reached the target score
+        """Check if the game is over with optimized checks."""
+        # Fast path: check scores first (most common game over condition)
         if any(score >= self.target_score for score in self.scores.values()):
             return True
 
-        # Check if both players are locked (no valid moves)
-        # Save the current player to restore it later
+        # Only check for locked players if score condition isn't met
         original_player = self.current_player
-
+        
         # Check if BLACK has valid moves
         self.current_player = PlayerColor.BLACK
-        black_has_moves = len(self._get_valid_moves()) > 0
+        black_has_moves = bool(self._get_valid_moves())
 
+        # If BLACK has moves, game is not over
+        if black_has_moves:
+            self.current_player = original_player
+            return False
+            
         # Check if RED has valid moves
         self.current_player = PlayerColor.RED
-        red_has_moves = len(self._get_valid_moves()) > 0
-
+        red_has_moves = bool(self._get_valid_moves())
+        
         # Restore original player
         self.current_player = original_player
 
         # Game is over if neither player can move
-        return not (black_has_moves or red_has_moves)
+        return not red_has_moves
 
     def get_winner(self) -> Optional[PlayerColor]:
         """Get the winner if the game is over."""
         if not self.is_game_over():
             return None
 
-        # If a player reached the target score
+        # Check score-based win first (most common)
         for player, score in self.scores.items():
             if score >= self.target_score:
                 return player
 
         # If both players are locked, the last player to move loses
-        # Save the current player
         original_player = self.current_player
 
-        # Check if RED has valid moves
+        # Check if either player has valid moves
         self.current_player = PlayerColor.RED
-        red_has_moves = len(self._get_valid_moves()) > 0
-
-        # Check if BLACK has valid moves
+        red_has_moves = bool(self._get_valid_moves())
+        
+        if red_has_moves:
+            self.current_player = original_player
+            return None
+            
         self.current_player = PlayerColor.BLACK
-        black_has_moves = len(self._get_valid_moves()) > 0
+        black_has_moves = bool(self._get_valid_moves())
 
         # Restore the original player
         self.current_player = original_player
@@ -127,44 +152,34 @@ class GameState:
         Returns:
             True if the move was successful, False otherwise
         """
-        # Make sure we're working with a copy to avoid modifying the original state
-        # until we know the move is valid
-        new_state = self.copy()
-
-        # Dispatch to the appropriate method based on move type
+        # Directly dispatch based on move type for speed
         success = False
-
+        
         if move.move_type == MoveType.INSERT:
-            success = new_state._apply_insert(move)
+            success = self._apply_insert(move)
         elif move.move_type == MoveType.DIAGONAL:
-            success = new_state._apply_diagonal(move)
+            success = self._apply_diagonal(move)
         elif move.move_type == MoveType.ATTACK:
-            success = new_state._apply_attack(move)
+            success = self._apply_attack(move)
         elif move.move_type == MoveType.JUMP:
-            success = new_state._apply_jump(move)
+            success = self._apply_jump(move)
 
         if success:
-            # Update our state from the new state
-            self.board = new_state.board
-            self.pieces_off_board = new_state.pieces_off_board
-            self.scores = new_state.scores
-            return True
-
-        return False
+            # Clear the move cache since the board state changed
+            self._valid_moves_cache = {}
+            
+        return success
 
     def _apply_insert(self, move: Move) -> bool:
-        """Apply an INSERT move."""
+        """Apply an INSERT move with faster checks."""
         player = self.current_player
-        row, col = move.end_pos
-
-        # Check if the move is valid
-        if row != player.start_row:
-            return False
-
-        if not self.is_empty((row, col)):
-            return False
-
         if self.pieces_off_board[player] <= 0:
+            return False
+            
+        row, col = move.end_pos
+        
+        # Fast check: verify row is the start row and position is empty
+        if row != player.start_row or self.board[row, col] != 0:
             return False
 
         # Apply the move
@@ -173,34 +188,31 @@ class GameState:
         return True
 
     def _apply_diagonal(self, move: Move) -> bool:
-        """Apply a DIAGONAL move."""
+        """Apply a DIAGONAL move with optimized checks."""
         player = self.current_player
         start_row, start_col = move.start_pos
         end_row, end_col = move.end_pos
 
-        # Check if the start position has the player's piece
+        # Fast fail if start position doesn't have player's piece
         if self.board[start_row, start_col] != player.value:
             return False
 
         # Check if this is a valid diagonal move
-        if player == PlayerColor.BLACK:
-            if end_row != start_row + 1 or abs(end_col - start_col) != 1:
-                return False
-        else:  # RED
-            if end_row != start_row - 1 or abs(end_col - start_col) != 1:
+        direction = player.direction
+        if end_row != start_row + direction or abs(end_col - start_col) != 1:
+            return False
+
+        # Check if end position is on board
+        if 0 <= end_row < self.BOARD_ROWS and 0 <= end_col < self.BOARD_COLS:
+            # Check if end position is empty
+            if self.board[end_row, end_col] != 0:
                 return False
 
-        # Check if the end position is on the board
-        if self.is_valid_position(move.end_pos):
-            # Check if the end position is empty
-            if not self.is_empty(move.end_pos):
-                return False
-
-            # Apply the move on the board
+            # Move on the board
             self.board[start_row, start_col] = 0
             self.board[end_row, end_col] = player.value
         else:
-            # The piece moves off the board (scores a point)
+            # Move off the board (scoring)
             self.board[start_row, start_col] = 0
             self.pieces_off_board[player] += 1
             self.scores[player] += 1
@@ -208,27 +220,21 @@ class GameState:
         return True
 
     def _apply_attack(self, move: Move) -> bool:
-        """Apply an ATTACK move."""
+        """Apply an ATTACK move with optimized checks."""
         player = self.current_player
         opponent = player.opposite()
         start_row, start_col = move.start_pos
         end_row, end_col = move.end_pos
 
-        # Check if the start position has the player's piece
-        if self.board[start_row, start_col] != player.value:
+        # Fast checks: start position has player's piece, end has opponent's piece
+        if (self.board[start_row, start_col] != player.value or 
+            self.board[end_row, end_col] != opponent.value):
             return False
 
-        # Check if the end position has the opponent's piece
-        if self.board[end_row, end_col] != opponent.value:
+        # Check if this is a valid attack move (directly in front)
+        direction = player.direction
+        if end_row != start_row + direction or end_col != start_col:
             return False
-
-        # Check if this is a valid attack move (piece directly in front)
-        if player == PlayerColor.BLACK:
-            if end_row != start_row + 1 or end_col != start_col:
-                return False
-        else:  # RED
-            if end_row != start_row - 1 or end_col != start_col:
-                return False
 
         # Apply the attack
         self.board[start_row, start_col] = 0
@@ -238,41 +244,39 @@ class GameState:
         return True
 
     def _apply_jump(self, move: Move) -> bool:
-        """Apply a JUMP move."""
+        """Apply a JUMP move with optimized checks."""
         player = self.current_player
         opponent = player.opposite()
         start_row, start_col = move.start_pos
         end_row, end_col = move.end_pos
 
-        # Check if the start position has the player's piece
-        if self.board[start_row, start_col] != player.value:
+        # Fast checks
+        if (self.board[start_row, start_col] != player.value or start_col != end_col):
             return False
 
-        # Check if this is a valid jump move (in same column)
-        if start_col != end_col:
-            return False
-
-        # Determine the direction of the jump
+        # Calculate jump parameters
         direction = player.direction
-
-        # Find the line of opponent pieces
+        
+        # Find line of opponent pieces (optimized)
         line_length = 0
         row = start_row + direction
-
-        while 0 <= row < 4 and self.board[row, start_col] == opponent.value:
+        
+        # Use direct array access instead of bounds checking in loop
+        while 0 <= row < self.BOARD_ROWS and self.board[row, start_col] == opponent.value:
             line_length += 1
             row += direction
 
-        # Check if there's a line of opponent pieces to jump over
+        # Check if there's a valid line to jump
         if line_length == 0 or line_length > 3:
             return False
 
-        # Check if the landing position is valid
+        # Calculate landing position
         landing_row = start_row + direction * (line_length + 1)
 
-        if self.is_valid_position((landing_row, start_col)):
-            # Landing on the board
-            if not self.is_empty((landing_row, start_col)):
+        # Handle on-board landing
+        if 0 <= landing_row < self.BOARD_ROWS:
+            # Check if landing position is empty
+            if self.board[landing_row, start_col] != 0:
                 return False
 
             # Apply the jump
@@ -287,110 +291,115 @@ class GameState:
         return True
 
     def get_valid_moves(self) -> List[Move]:
-        """Get all valid moves for the current player."""
+        """Get all valid moves for the current player with caching."""
         return self._get_valid_moves()
 
     def _get_valid_moves(self) -> List[Move]:
-        """Internal method to get all valid moves for the current player."""
-        moves = []
+        """Internal method to get all valid moves for the current player, optimized with caching."""
+        # Check the cache first - create a cache key based on the board state and current player
+        # We use the board array's data buffer and the current player as the key
         player = self.current_player
-
-        # 1. Insert moves
+        
+        # Use the board's data buffer, which is a more direct representation
+        cache_key = (self.board.tobytes(), player, self.pieces_off_board[player])
+        
+        if cache_key in self._valid_moves_cache:
+            return self._valid_moves_cache[cache_key]
+        
+        moves = []
+        player_value = player.value
+        opponent_value = -player_value  # Faster than calling opposite()
+        direction = player.direction
+        
+        # 1. Insert moves - only if player has pieces off board
         if self.pieces_off_board[player] > 0:
             start_row = player.start_row
-            for col in range(3):
-                if self.is_empty((start_row, col)):
+            # Fast iteration over columns
+            for col in range(self.BOARD_COLS):
+                if self.board[start_row, col] == 0:
                     moves.append(Move(MoveType.INSERT, end_pos=(start_row, col)))
 
-        # 2. Diagonal moves
-        player_value = player.value
-        direction = player.direction
-
-        for row in range(4):
-            for col in range(3):
+        # Collect positions of player's pieces for faster processing
+        player_positions = []
+        for row in range(self.BOARD_ROWS):
+            for col in range(self.BOARD_COLS):
                 if self.board[row, col] == player_value:
-                    # Try both diagonal directions
-                    for col_offset in [-1, 1]:
-                        new_row = row + direction
-                        new_col = col + col_offset
-
-                        # Check if the destination is on the board
-                        if 0 <= new_col < 3:
-                            if 0 <= new_row < 4:
-                                # Destination is on the board
-                                if self.is_empty((new_row, new_col)):
-                                    moves.append(
-                                        Move(
-                                            MoveType.DIAGONAL,
-                                            start_pos=(row, col),
-                                            end_pos=(new_row, new_col),
-                                        )
-                                    )
-                            else:
-                                # Moving off the board (scoring)
-                                moves.append(
-                                    Move(
-                                        MoveType.DIAGONAL,
-                                        start_pos=(row, col),
-                                        end_pos=(new_row, new_col),
-                                    )
-                                )
-
-        # 3. Attack moves
-        opponent_value = player.opposite().value
-
-        for row in range(4):
-            for col in range(3):
-                if self.board[row, col] == player_value:
-                    # Try to attack directly in front
-                    new_row = row + direction
-
-                    if 0 <= new_row < 4:
-                        if self.board[new_row, col] == opponent_value:
+                    player_positions.append((row, col))
+        
+        # Process all moves from each player piece position
+        for row, col in player_positions:
+            # 2. Diagonal moves - use pre-calculated offsets
+            for row_offset, col_offset in self.DIAGONAL_OFFSETS[player]:
+                new_row = row + row_offset
+                new_col = col + col_offset
+                
+                if 0 <= new_col < self.BOARD_COLS:
+                    if 0 <= new_row < self.BOARD_ROWS:
+                        # On-board diagonal move
+                        if self.board[new_row, new_col] == 0:
                             moves.append(
                                 Move(
-                                    MoveType.ATTACK,
+                                    MoveType.DIAGONAL,
                                     start_pos=(row, col),
-                                    end_pos=(new_row, col),
+                                    end_pos=(new_row, new_col),
                                 )
                             )
-
-        # 4. Jump moves
-        for row in range(4):
-            for col in range(3):
-                if self.board[row, col] == player_value:
-                    # Look for a line of opponent pieces
-                    line_length = 0
-                    curr_row = row + direction
-
-                    while (
-                        0 <= curr_row < 4
-                        and self.board[curr_row, col] == opponent_value
-                    ):
-                        line_length += 1
-                        curr_row += direction
-
-                    if 1 <= line_length <= 3:
-                        landing_row = row + (line_length + 1) * direction
-
-                        # Check if landing is on board
-                        if 0 <= landing_row < 4:
-                            if self.is_empty((landing_row, col)):
-                                moves.append(
-                                    Move(
-                                        MoveType.JUMP,
-                                        start_pos=(row, col),
-                                        end_pos=(landing_row, col),
-                                    )
-                                )
-                        else:
-                            # Jumping off the board (scoring)
-                            moves.append(
-                                Move(
-                                    MoveType.JUMP,
-                                    start_pos=(row, col),
-                                    end_pos=(landing_row, col),
-                                )
+                    else:
+                        # Off-board diagonal move (scoring)
+                        moves.append(
+                            Move(
+                                MoveType.DIAGONAL,
+                                start_pos=(row, col),
+                                end_pos=(new_row, new_col),
                             )
-
+                        )
+            
+            # 3. Attack moves - directly in front
+            attack_row = row + direction
+            if 0 <= attack_row < self.BOARD_ROWS and self.board[attack_row, col] == opponent_value:
+                moves.append(
+                    Move(
+                        MoveType.ATTACK,
+                        start_pos=(row, col),
+                        end_pos=(attack_row, col),
+                    )
+                )
+            
+            # 4. Jump moves - optimized to avoid redundant checks
+            # Find line of opponent pieces
+            line_length = 0
+            curr_row = row + direction
+            
+            # Count opponent pieces in a line
+            while 0 <= curr_row < self.BOARD_ROWS and self.board[curr_row, col] == opponent_value:
+                line_length += 1
+                curr_row += direction
+            
+            # Only process if there's a valid line to jump
+            if 1 <= line_length <= 3:
+                landing_row = row + (line_length + 1) * direction
+                
+                # Check landing position
+                if 0 <= landing_row < self.BOARD_ROWS:
+                    # Landing on board
+                    if self.board[landing_row, col] == 0:
+                        moves.append(
+                            Move(
+                                MoveType.JUMP,
+                                start_pos=(row, col),
+                                end_pos=(landing_row, col),
+                            )
+                        )
+                else:
+                    # Jumping off board (scoring)
+                    moves.append(
+                        Move(
+                            MoveType.JUMP,
+                            start_pos=(row, col),
+                            end_pos=(landing_row, col),
+                        )
+                    )
+        
+        # Cache the result
+        self._valid_moves_cache[cache_key] = moves
         return moves
