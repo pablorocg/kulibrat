@@ -6,7 +6,7 @@ import random
 import time
 from typing import Optional, Tuple
 
-from src.core.game_state import GameState
+from src.core.game_state_cy import GameState
 from src.core.move import Move
 from src.core.player_color import PlayerColor
 from src.players.ai.ai_strategy import AIStrategy
@@ -15,7 +15,7 @@ from src.players.ai.ai_strategy import AIStrategy
 class MinimaxStrategy(AIStrategy):
     """AI strategy using the minimax algorithm with optional alpha-beta pruning."""
 
-    def __init__(self, max_depth: int = 5, use_alpha_beta: bool = True):
+    def __init__(self, max_depth: int = 15, use_alpha_beta: bool = True):
         """
         Initialize the minimax strategy.
 

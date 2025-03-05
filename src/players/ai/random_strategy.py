@@ -6,7 +6,7 @@ import random
 from typing import Optional
 
 # Import from other modules
-from src.core.game_state import GameState
+from src.core.game_state_cy import GameState
 from src.core.move import Move
 from src.core.player_color import PlayerColor
 from src.players.ai.ai_strategy import AIStrategy

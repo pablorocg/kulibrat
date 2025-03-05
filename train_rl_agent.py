@@ -5,22 +5,15 @@ Train a reinforcement learning agent for Kulibrat using self-play.
 
 import os
 import argparse
-import time
-import random
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from typing import List, Dict, Tuple, Any, Optional
+from typing import List, Tuple, Optional
 
 from src.core.player_color import PlayerColor
-from src.core.game_state import GameState
-from src.core.move import Move
-from src.core.move_type import MoveType
+from src.core.game_state_cy import GameState
 from src.players.ai.rl_strategy import RLStrategy
 from src.players.ai.rl_model import KulibratNet, encode_board
 from src.players.ai.simple_ai_player import SimpleAIPlayer
@@ -446,7 +439,7 @@ def main():
     parser.add_argument(
         "--num-games",
         type=int,
-        default=100,
+        default=1000,
         help="Number of self-play games to generate per iteration (default: 100)"
     )
     
@@ -460,7 +453,7 @@ def main():
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=64,
+        default=128,
         help="Batch size for training (default: 64)"
     )
     

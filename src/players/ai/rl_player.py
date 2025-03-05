@@ -4,7 +4,7 @@ Reinforcement Learning player for Kulibrat.
 
 from typing import Optional
 
-from src.core.game_state import GameState
+from src.core.game_state_cy import GameState
 from src.core.move import Move
 from src.core.player_color import PlayerColor
 from src.players.ai.ai_player import AIPlayer

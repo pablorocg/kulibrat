@@ -2,7 +2,7 @@ import os
 import time
 from typing import List, Optional
 
-from src.core.game_state import GameState
+from src.core.game_state_cy import GameState
 from src.core.move import Move
 from src.core.move_type import MoveType
 from src.core.player_color import PlayerColor
