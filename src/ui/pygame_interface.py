@@ -2,9 +2,11 @@
 Enhanced Pygame interface for the Kulibrat game.
 """
 
-import math
+import os
 import sys
-from typing import List, Optional
+import time
+import math
+from typing import List, Optional, Dict, Tuple
 
 import pygame
 
@@ -22,7 +24,7 @@ class KulibratGUI(GameInterface):
     Focuses on essential gameplay functionality with clean, simple visuals.
     """
 
-    def __init__(self, screen_width=1024, screen_height=768):
+    def __init__(self, screen_width=1024, screen_height=800):
         """Initialize the GUI with default settings."""
         pygame.init()
         pygame.display.set_caption("Kulibrat")
@@ -59,14 +61,9 @@ class KulibratGUI(GameInterface):
             "start_row_black": (180, 190, 240, 80),
             "start_row_red": (240, 190, 190, 80),
             # Score zones (new)
-            "score_zone_inactive": (
-                245,
-                245,
-                180,
-                80,
-            ),  # Light yellow with transparency
-            "score_zone_active": (255, 215, 0, 150),  # Gold with transparency
-            "score_zone_text": (180, 0, 0),  # Dark red for score text
+            "score_zone_inactive": (245, 245, 180, 80),  # Light yellow with transparency
+            "score_zone_active": (255, 215, 0, 150),     # Gold with transparency
+            "score_zone_text": (180, 0, 0),              # Dark red for score text
         }
 
         # Font setup
@@ -424,11 +421,9 @@ class KulibratGUI(GameInterface):
             black_score_zone,
             (self.board_x, self.board_y + self.cell_size * self.board_rows),
         )
-
+        
         # Add "SCORE ZONE" text for BLACK
-        score_text = self.fonts["small"].render(
-            "BLACK SCORES HERE", True, self.colors["score_zone_text"]
-        )
+        score_text = self.fonts["small"].render("BLACK SCORES HERE", True, self.colors["score_zone_text"])
         text_rect = score_text.get_rect(
             center=(
                 self.board_x + self.board_width // 2,
@@ -446,11 +441,9 @@ class KulibratGUI(GameInterface):
             red_score_zone,
             (self.board_x, self.board_y - self.cell_size // 4),
         )
-
+        
         # Add "SCORE ZONE" text for RED
-        score_text = self.fonts["small"].render(
-            "RED SCORES HERE", True, self.colors["score_zone_text"]
-        )
+        score_text = self.fonts["small"].render("RED SCORES HERE", True, self.colors["score_zone_text"])
         text_rect = score_text.get_rect(
             center=(
                 self.board_x + self.board_width // 2,
@@ -592,11 +585,7 @@ class KulibratGUI(GameInterface):
 
     def _highlight_scoring_opportunities(self):
         """Highlight potential scoring moves in a clear, distinctive way."""
-        if (
-            not self.waiting_for_move
-            or not self.selected_pos
-            or not self.current_game_state
-        ):
+        if not self.waiting_for_move or not self.selected_pos or not self.current_game_state:
             return
 
         piece_row, piece_col = self.selected_pos
@@ -607,15 +596,8 @@ class KulibratGUI(GameInterface):
         for move in self.valid_moves:
             if move.start_pos == self.selected_pos:
                 # Check if this is a scoring move
-                if (
-                    current_player == PlayerColor.BLACK
-                    and move.end_pos
-                    and move.end_pos[0] >= self.board_rows
-                ) or (
-                    current_player == PlayerColor.RED
-                    and move.end_pos
-                    and move.end_pos[0] < 0
-                ):
+                if (current_player == PlayerColor.BLACK and move.end_pos and move.end_pos[0] >= self.board_rows) or \
+                   (current_player == PlayerColor.RED and move.end_pos and move.end_pos[0] < 0):
                     scoring_moves.append(move)
 
         if not scoring_moves:
@@ -623,7 +605,7 @@ class KulibratGUI(GameInterface):
 
         # Define the scoring row based on current player
         scoring_row = self.board_rows - 1 if current_player == PlayerColor.BLACK else 0
-
+        
         # Highlight scoring zones more prominently when scoring is possible
         if current_player == PlayerColor.BLACK:
             # BLACK player can score - highlight bottom zone
@@ -635,22 +617,18 @@ class KulibratGUI(GameInterface):
                 score_zone,
                 (self.board_x, self.board_y + self.cell_size * self.board_rows),
             )
-
-            # Add flashing "SCORE!" text
+            
+            # Add flashing "CLICK HERE TO SCORE" text
             flash_alpha = 128 + int(127 * math.sin(pygame.time.get_ticks() / 200))
-            score_text = self.fonts["normal"].render(
-                "SCORE!", True, (255, 0, 0, flash_alpha)
-            )
+            score_text = self.fonts["normal"].render("CLICK HERE TO SCORE", True, (255, 0, 0, flash_alpha))
             text_rect = score_text.get_rect(
                 center=(
                     self.board_x + self.board_width // 2,
-                    self.board_y
-                    + self.cell_size * self.board_rows
-                    + self.cell_size // 6,
+                    self.board_y + self.cell_size * self.board_rows + self.cell_size // 6,
                 )
             )
             self.screen.blit(score_text, text_rect)
-
+            
         elif current_player == PlayerColor.RED:
             # RED player can score - highlight top zone
             score_zone = pygame.Surface(
@@ -661,12 +639,10 @@ class KulibratGUI(GameInterface):
                 score_zone,
                 (self.board_x, self.board_y - self.cell_size // 3),
             )
-
-            # Add flashing "SCORE!" text
+            
+            # Add flashing "CLICK HERE TO SCORE" text
             flash_alpha = 128 + int(127 * math.sin(pygame.time.get_ticks() / 200))
-            score_text = self.fonts["normal"].render(
-                "SCORE!", True, (255, 0, 0, flash_alpha)
-            )
+            score_text = self.fonts["normal"].render("CLICK HERE TO SCORE", True, (255, 0, 0, flash_alpha))
             text_rect = score_text.get_rect(
                 center=(
                     self.board_x + self.board_width // 2,
@@ -675,74 +651,97 @@ class KulibratGUI(GameInterface):
             )
             self.screen.blit(score_text, text_rect)
 
-        # Highlight individual scoring options
+        # Mark the scoring columns for possible diagonal and jump moves
         for move in scoring_moves:
-            # Calculate where the move would end (even if off board)
+            # Calculate which column in the score zone should be highlighted
             target_col = piece_col
             if move.move_type == MoveType.DIAGONAL:
-                # For diagonal moves, determine the column offset
-                target_col = move.end_pos[
-                    1
-                ]  # Use the actual target column from the move
-
+                # For diagonal moves, determine the target column
+                target_col = move.end_pos[1]
+            
             # Only highlight if the column is valid
             if 0 <= target_col < self.board_cols:
-                # Get screen coordinates for the scoring edge cell
+                # Get screen coordinates for highlighting in the score zone
                 cell_x = self.board_x + target_col * self.cell_size
+                
+                if current_player == PlayerColor.BLACK:
+                    # Highlight in BLACK's scoring zone (bottom)
+                    score_y = self.board_y + self.cell_size * self.board_rows
+                    highlight = pygame.Surface(
+                        (self.cell_size, self.cell_size // 3), pygame.SRCALPHA
+                    )
+                    pulse_factor = 0.7 + 0.3 * math.sin(pygame.time.get_ticks() / 150)
+                    highlight_color = (
+                        int(255 * pulse_factor),
+                        int(215 * pulse_factor),
+                        int(0 * pulse_factor),
+                        200
+                    )
+                    highlight.fill(highlight_color)
+                    self.screen.blit(highlight, (cell_x, score_y))
+                    
+                    # Add move type indicator
+                    move_type_text = "DIAGONAL" if move.move_type == MoveType.DIAGONAL else "JUMP"
+                    text = self.fonts["small"].render(move_type_text, True, (0, 0, 0))
+                    text_width, text_height = text.get_size()
+                    rotated_text = pygame.transform.rotate(text, 90)  # Rotate text for better visibility
+                    text_rect = rotated_text.get_rect(
+                        center=(cell_x + self.cell_size // 2, score_y + self.cell_size // 6)
+                    )
+                    self.screen.blit(rotated_text, text_rect)
+                    
+                else:  # RED
+                    # Highlight in RED's scoring zone (top)
+                    score_y = self.board_y - self.cell_size // 3
+                    highlight = pygame.Surface(
+                        (self.cell_size, self.cell_size // 3), pygame.SRCALPHA
+                    )
+                    pulse_factor = 0.7 + 0.3 * math.sin(pygame.time.get_ticks() / 150)
+                    highlight_color = (
+                        int(255 * pulse_factor),
+                        int(215 * pulse_factor),
+                        int(0 * pulse_factor),
+                        200
+                    )
+                    highlight.fill(highlight_color)
+                    self.screen.blit(highlight, (cell_x, score_y))
+                    
+                    # Add move type indicator
+                    move_type_text = "DIAGONAL" if move.move_type == MoveType.DIAGONAL else "JUMP"
+                    text = self.fonts["small"].render(move_type_text, True, (0, 0, 0))
+                    text_width, text_height = text.get_size()
+                    rotated_text = pygame.transform.rotate(text, 90)  # Rotate text for better visibility
+                    text_rect = rotated_text.get_rect(
+                        center=(cell_x + self.cell_size // 2, score_y + self.cell_size // 6)
+                    )
+                    self.screen.blit(rotated_text, text_rect)
+                
+                # Still highlight the edge cell on the board to show the path
                 cell_y = self.board_y + scoring_row * self.cell_size
-
-                # Draw special pulsing highlight for scoring move
-                pulse_factor = 0.7 + 0.3 * math.sin(pygame.time.get_ticks() / 200)
-                pulse_color = (
-                    int(255 * pulse_factor),
-                    int(215 * pulse_factor),
-                    int(0 * pulse_factor),
-                    180,
-                )
-
-                highlight = pygame.Surface(
+                edge_highlight = pygame.Surface(
                     (self.cell_size, self.cell_size), pygame.SRCALPHA
                 )
-                highlight.fill(pulse_color)
-                self.screen.blit(highlight, (cell_x, cell_y))
-
+                edge_highlight.fill((100, 200, 100, 120))  # Light green with transparency
+                self.screen.blit(edge_highlight, (cell_x, cell_y))
+                
                 # Add an arrow pointing to the scoring zone
                 arrow_color = (255, 0, 0)  # Red arrow
                 if current_player == PlayerColor.BLACK:
                     # Draw arrow pointing down
                     points = [
                         (cell_x + self.cell_size // 2, cell_y + self.cell_size),
-                        (
-                            cell_x + self.cell_size // 4,
-                            cell_y + self.cell_size * 2 // 3,
-                        ),
-                        (
-                            cell_x + self.cell_size * 3 // 4,
-                            cell_y + self.cell_size * 2 // 3,
-                        ),
+                        (cell_x + self.cell_size // 4, cell_y + self.cell_size * 2 // 3),
+                        (cell_x + self.cell_size * 3 // 4, cell_y + self.cell_size * 2 // 3)
                     ]
                 else:  # RED
                     # Draw arrow pointing up
                     points = [
                         (cell_x + self.cell_size // 2, cell_y),
                         (cell_x + self.cell_size // 4, cell_y + self.cell_size // 3),
-                        (
-                            cell_x + self.cell_size * 3 // 4,
-                            cell_y + self.cell_size // 3,
-                        ),
+                        (cell_x + self.cell_size * 3 // 4, cell_y + self.cell_size // 3)
                     ]
-
+                
                 pygame.draw.polygon(self.screen, arrow_color, points)
-
-                # Add move type label
-                move_type_text = (
-                    "DIAGONAL" if move.move_type == MoveType.DIAGONAL else "JUMP"
-                )
-                text = self.fonts["small"].render(move_type_text, True, (0, 0, 0))
-                text_rect = text.get_rect(
-                    center=(cell_x + self.cell_size // 2, cell_y + self.cell_size // 2)
-                )
-                self.screen.blit(text, text_rect)
 
     def _draw_sidebar(self):
         """Draw the game information sidebar."""
@@ -965,20 +964,18 @@ class KulibratGUI(GameInterface):
             centerx=sidebar_x + self.sidebar_width // 2, y=move_box_y
         )
         self.screen.blit(move_box_title, move_box_rect)
-
+        
         # Move type explanations
         move_types = [
             "INSERT: Place new piece on your start row",
             "DIAGONAL: Move diagonally forward one space",
             "ATTACK: Capture opponent's piece in front",
-            "JUMP: Leap over opponent's piece(s)",
+            "JUMP: Leap over opponent's piece(s)"
         ]
-
+        
         move_y = move_box_rect.bottom + 15
         for move_type in move_types:
-            move_text = self.fonts["small"].render(
-                move_type, True, self.colors["text_dark"]
-            )
+            move_text = self.fonts["small"].render(move_type, True, self.colors["text_dark"])
             self.screen.blit(move_text, (bar_x, move_y))
             move_y += 20
 
@@ -1034,6 +1031,73 @@ class KulibratGUI(GameInterface):
                 if button_id == "rules":
                     self._show_rules()
                 return
+                
+        # First, determine if this is a click in a score zone
+        in_black_score_zone = (
+            self.board_x <= mouse_pos[0] <= self.board_x + self.board_width and
+            self.board_y + self.cell_size * self.board_rows <= mouse_pos[1] <= self.board_y + self.cell_size * self.board_rows + self.cell_size // 3
+        )
+        
+        in_red_score_zone = (
+            self.board_x <= mouse_pos[0] <= self.board_x + self.board_width and
+            self.board_y - self.cell_size // 3 <= mouse_pos[1] <= self.board_y
+        )
+        
+        # Handle scoring clicks in score zones
+        if (in_black_score_zone or in_red_score_zone) and self.selected_pos is not None:
+            # Calculate target column (only need x coordinate)
+            col = (mouse_pos[0] - self.board_x) // self.cell_size
+            if not (0 <= col < self.board_cols):
+                return
+                
+            piece_row, piece_col = self.selected_pos
+            current_player = self.current_game_state.current_player
+            
+            # Verify this is a valid scoring zone for the current player
+            if (current_player == PlayerColor.BLACK and in_black_score_zone) or \
+               (current_player == PlayerColor.RED and in_red_score_zone):
+                
+                scoring_moves = []
+                
+                # Find diagonal scoring moves
+                if abs(col - piece_col) == 1:  # Diagonal move condition
+                    diagonal_scoring_moves = [
+                        m for m in self.valid_moves
+                        if m.start_pos == self.selected_pos and 
+                        m.move_type == MoveType.DIAGONAL and
+                        m.end_pos[1] == col and
+                        ((current_player == PlayerColor.BLACK and m.end_pos[0] >= self.board_rows) or
+                         (current_player == PlayerColor.RED and m.end_pos[0] < 0))
+                    ]
+                    scoring_moves.extend(diagonal_scoring_moves)
+                
+                # Find jump scoring moves
+                if col == piece_col:  # Jump move condition (same column)
+                    jump_scoring_moves = [
+                        m for m in self.valid_moves
+                        if m.start_pos == self.selected_pos and
+                        m.move_type == MoveType.JUMP and
+                        m.end_pos[1] == col and
+                        ((current_player == PlayerColor.BLACK and m.end_pos[0] >= self.board_rows) or
+                         (current_player == PlayerColor.RED and m.end_pos[0] < 0))
+                    ]
+                    scoring_moves.extend(jump_scoring_moves)
+                
+                if scoring_moves:
+                    # Execute the scoring move
+                    self.selected_move = scoring_moves[0]
+                    self.waiting_for_move = False
+                    
+                    # Show appropriate message
+                    move_type_name = "Diagonal" if self.selected_move.move_type == MoveType.DIAGONAL else "Jump"
+                    self.show_message(f"{move_type_name} move scores a point for {current_player.name}!")
+                    return
+                else:
+                    self.show_message("Invalid scoring move. Try a different piece or move.")
+                    return
+            else:
+                self.show_message("Wrong scoring zone for your player!")
+                return
 
         # Check if click is on the board
         if not (
@@ -1079,9 +1143,27 @@ class KulibratGUI(GameInterface):
             ):
                 # Select this piece for moving
                 self.selected_pos = pos
-                self.show_message(
-                    f"Piece selected at {pos}. Click a highlighted square to move."
-                )
+                
+                # Check if this piece has scoring moves
+                current_player = self.current_game_state.current_player
+                has_scoring_moves = False
+                
+                for move in piece_moves:
+                    if move.end_pos and (
+                        (current_player == PlayerColor.BLACK and move.end_pos[0] >= self.board_rows) or
+                        (current_player == PlayerColor.RED and move.end_pos[0] < 0)
+                    ):
+                        has_scoring_moves = True
+                        break
+                
+                if has_scoring_moves:
+                    self.show_message(
+                        f"Piece selected at {pos}. Click in the score zone to score or on the board for a regular move."
+                    )
+                else:
+                    self.show_message(
+                        f"Piece selected at {pos}. Click a highlighted square to move."
+                    )
             elif insert_moves:
                 # Directly make an insert move
                 self.selected_move = insert_moves[0]
@@ -1091,101 +1173,30 @@ class KulibratGUI(GameInterface):
         else:
             # A position was already selected, check if the new click is a valid move
             piece_row, piece_col = self.selected_pos
-            current_player = self.current_game_state.current_player
-
-            # Enhanced logic for ALL valid move types
-            possible_moves = []
-
-            # Check for standard moves (within board)
+            
+            # In-board moves only (no scoring moves when clicking inside the board)
             standard_moves = [
-                m
-                for m in self.valid_moves
-                if m.start_pos == self.selected_pos and m.end_pos == pos
+                m for m in self.valid_moves 
+                if m.start_pos == self.selected_pos and 
+                m.end_pos == pos and
+                m.end_pos[0] >= 0 and 
+                m.end_pos[0] < self.board_rows
             ]
-            possible_moves.extend(standard_moves)
-
-            # Check for scoring diagonal moves
-            if (current_player == PlayerColor.BLACK and row == self.board_rows - 1) or (
-                current_player == PlayerColor.RED and row == 0
-            ):
-                # Find diagonal scoring moves that would match this edge position
-                diagonal_scoring_moves = [
-                    m
-                    for m in self.valid_moves
-                    if m.start_pos == self.selected_pos
-                    and m.move_type == MoveType.DIAGONAL
-                    and abs(m.end_pos[1] - piece_col) == 1
-                    and (
-                        (
-                            current_player == PlayerColor.BLACK
-                            and m.end_pos[0] >= self.board_rows
-                        )
-                        or (current_player == PlayerColor.RED and m.end_pos[0] < 0)
-                    )
-                    and m.end_pos[1] == col  # Make sure column matches
-                ]
-                possible_moves.extend(diagonal_scoring_moves)
-
-            # Check for scoring jump moves
-            if (
-                current_player == PlayerColor.BLACK
-                and row == self.board_rows - 1
-                and col == piece_col
-            ) or (current_player == PlayerColor.RED and row == 0 and col == piece_col):
-                # Find jump scoring moves in the same column
-                jump_scoring_moves = [
-                    m
-                    for m in self.valid_moves
-                    if m.start_pos == self.selected_pos
-                    and m.move_type == MoveType.JUMP
-                    and (
-                        (
-                            current_player == PlayerColor.BLACK
-                            and m.end_pos[0] >= self.board_rows
-                        )
-                        or (current_player == PlayerColor.RED and m.end_pos[0] < 0)
-                    )
-                    and m.end_pos[1] == col  # Make sure column matches
-                ]
-                possible_moves.extend(jump_scoring_moves)
-
-            if possible_moves:
-                # Make the move (take the first valid move - should only be one)
-                self.selected_move = possible_moves[0]
+            
+            if standard_moves:
+                # Execute the regular move
+                self.selected_move = standard_moves[0]
                 self.waiting_for_move = False
-
-                # Show appropriate message based on move type
+                
+                # Show appropriate message
                 move_type = self.selected_move.move_type
-                is_scoring = (
-                    current_player == PlayerColor.BLACK
-                    and self.selected_move.end_pos
-                    and self.selected_move.end_pos[0] >= self.board_rows
-                ) or (
-                    current_player == PlayerColor.RED
-                    and self.selected_move.end_pos
-                    and self.selected_move.end_pos[0] < 0
-                )
-
+                
                 if move_type == MoveType.DIAGONAL:
-                    if is_scoring:
-                        self.show_message(
-                            f"Diagonal move scores a point for {current_player.name}!"
-                        )
-                    else:
-                        self.show_message(
-                            f"Diagonal move from {self.selected_pos} to {pos}."
-                        )
+                    self.show_message(f"Diagonal move from {self.selected_pos} to {pos}.")
                 elif move_type == MoveType.ATTACK:
-                    self.show_message(
-                        f"Attack! {current_player.name} captures opponent's piece."
-                    )
+                    self.show_message(f"Attack! {self.current_game_state.current_player.name} captures opponent's piece.")
                 elif move_type == MoveType.JUMP:
-                    if is_scoring:
-                        self.show_message(
-                            f"Jump scores a point for {current_player.name}!"
-                        )
-                    else:
-                        self.show_message(f"Jump from {self.selected_pos} to {pos}.")
+                    self.show_message(f"Jump from {self.selected_pos} to {pos}.")
             else:
                 # Check if clicked on another one of player's pieces
                 piece_value = self.current_game_state.board[row, col]
@@ -1196,7 +1207,25 @@ class KulibratGUI(GameInterface):
                     and piece_moves
                 ):
                     self.selected_pos = pos
-                    self.show_message(f"Changed selection to piece at {pos}.")
+                    
+                    # Check if this piece has scoring moves
+                    current_player = self.current_game_state.current_player
+                    has_scoring_moves = False
+                    
+                    for move in piece_moves:
+                        if move.end_pos and (
+                            (current_player == PlayerColor.BLACK and move.end_pos[0] >= self.board_rows) or
+                            (current_player == PlayerColor.RED and move.end_pos[0] < 0)
+                        ):
+                            has_scoring_moves = True
+                            break
+                    
+                    if has_scoring_moves:
+                        self.show_message(
+                            f"Piece selected at {pos}. Click in the score zone to score or on the board for a regular move."
+                        )
+                    else:
+                        self.show_message(f"Changed selection to piece at {pos}.")
                 else:
                     # Invalid move, deselect
                     self.selected_pos = None
@@ -1252,7 +1281,7 @@ class KulibratGUI(GameInterface):
             "- If a player has no valid moves, their turn is skipped.",
             "- If neither player can move, the last player to move loses.",
             "- BLACK moves pieces from top to bottom, RED from bottom to top.",
-            "- When a piece scores, it's removed and can be reused.",
+            "- When a piece scores, it's removed and can be reused."
         ]
 
         y_offset = 80
