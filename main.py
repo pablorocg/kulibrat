@@ -59,7 +59,7 @@ def setup_game_options() -> Dict[str, Any]:
     parser.add_argument(
         "--player-2-type",
         choices=["human", "minimax", "random", "mcts", "rl"],
-        default="random",
+        default="minimax",
         help="Player 2 type (human, minimax, random, mcts, rl)",
     )
 
