@@ -5,7 +5,7 @@ Abstract base class for AI strategies in Kulibrat.
 from abc import ABC, abstractmethod
 from typing import Optional
 
-# Import from core module
+
 from src.core.game_state import GameState
 from src.core.move import Move
 from src.core.player_color import PlayerColor
