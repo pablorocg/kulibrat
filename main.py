@@ -2,141 +2,64 @@
 """
 Main entry point for the Kulibrat game.
 
-This script initializes and runs the Kulibrat game with different modes and configurations.
+This script initializes and runs the Kulibrat game with configurations from YAML.
 
 Run this file from the project root:
 python main.py
-
-Command line options:
---interface: Choose game interface (console or pygame) (default: console)
---player-1-type: Player 1 type (human, minimax, random, mcts, rl, alphazero) (default: human)
---player-2-type: Player 2 type (human, minimax, random, mcts, rl, alphazero) (default: random)
---player-1-color: Color for player 1 (black or red) (default: black)
---target-score: Score needed to win the game (default: 5)
---rl-model-1: Path to the trained RL model file for player 1 (default: models/rl_model.pth)
---rl-model-2: Path to the trained RL model file for player 2 (default: models/rl_model.pth)
---az-model-1: Path to the trained AlphaZero model file for player 1 (default: models/alphazero_model_best.pt)
---az-model-2: Path to the trained AlphaZero model file for player 2 (default: models/alphazero_model_best.pt)
---az-simulations: Number of MCTS simulations for AlphaZero (default: 800)
 """
 
-import argparse
-import os
+import logging
 import time
-from typing import Any, Dict
 
+# Core game imports
 from src.core.game_engine import GameEngine
+from src.core.game_rules import GameRules
+from src.core.turn_manager import TurnManager
 from src.core.player_color import PlayerColor
-from src.players.ai.mcts_strategy import MCTSStrategy
-from src.players.ai.minimax_strategy import MinimaxStrategy
-from src.players.ai.random_strategy import RandomStrategy
-from src.players.ai.simple_ai_player import SimpleAIPlayer
-from src.players.human_player import HumanPlayer
+
+# Configuration and factory imports
+from src.config.game_config import GameConfig
+from src.players.player_factory import PlayerFactory
+
+# UI imports
 from src.ui.console_interface import ConsoleInterface
 
 
-def setup_game_options() -> Dict[str, Any]:
+def create_interface(interface_type: str):
     """
-    Parse command line arguments and setup game options.
-
-    Returns:
-        Dictionary of game options
-    """
-    parser = argparse.ArgumentParser(description="Kulibrat Game")
-
-    parser.add_argument(
-        "--interface",
-        choices=["console", "pygame"],
-        default="console",
-        help="Choose game interface (console or pygame)",
-    )
-
-    parser.add_argument(
-        "--player-1-type",
-        choices=["human", "minimax", "random", "mcts"],
-        default="human",
-        help="Player 1 type (human, minimax, random, mcts)",
-    )
-
-    parser.add_argument(
-        "--player-2-type",
-        choices=["human", "minimax", "random", "mcts"],
-        default="minimax",
-        help="Player 2 type (human, minimax, random, mcts)",
-    )
-
-    parser.add_argument(
-        "--player-1-color",
-        choices=["black", "red"],
-        default="black",
-        help="Color for player 1",
-    )
-
-    parser.add_argument(
-        "--target-score", type=int, default=5, help="Score needed to win the game"
-    )
-
-    
-
-    return vars(parser.parse_args())
-
-
-def create_player(
-    player_type,
-    player_color,
-    interface,
-    player_name=None,
-):
-    """
-    Create a player based on the specified type and color.
+    Create game interface based on type.
 
     Args:
-        player_type: Type of player (human, minimax, random, mcts, rl, alphazero)
-        player_color: Player's color (PlayerColor.BLACK or PlayerColor.RED)
-        interface: Game interface
-        rl_model_path: Path to the RL model file (only needed for RL players)
-        az_model_path: Path to the AlphaZero model file (only needed for AlphaZero players)
-        az_simulations: Number of MCTS simulations for AlphaZero players
-        player_name: Name of the player (optional)
+        interface_type: Type of interface to create
 
     Returns:
-        Player object
+        Game interface instance
     """
-    if player_type == "human":
-        return HumanPlayer(color=player_color, interface=interface, name="Human")
-    elif player_type == "minimax":
-        return SimpleAIPlayer(
-            color=player_color,
-            strategy=MinimaxStrategy(max_depth=6, use_alpha_beta=True),
-            name="Minimax",
-        )
-    elif player_type == "mcts":
-        return SimpleAIPlayer(
-            color=player_color,
-            strategy=MCTSStrategy(simulation_time=1.5, max_iterations=30000),
-            name="MCTS",
-        )
-    elif player_type == "random":
-        return SimpleAIPlayer(
-            color=player_color, strategy=RandomStrategy(), name="Random"
-        )
-
-   
-    else:
-        raise ValueError(f"Invalid player type: {player_type}")
+    # Default to console interface
+    if interface_type == "pygame":
+        try:
+            # Lazy import to avoid dependency
+            from src.ui.pygame_interface import KulibratGUI
+            return KulibratGUI()
+        except ImportError:
+            logging.warning("PyGame not installed. Falling back to console interface.")
+    
+    return ConsoleInterface()
 
 
-
-def get_game_mode(player_1_type, player_2_type):
+def validate_player_configuration(
+    player_1_type: str, 
+    player_2_type: str
+) -> str:
     """
-    Determine the game mode based on player types.
+    Validate the player configuration.
 
     Args:
         player_1_type: Type of player 1
         player_2_type: Type of player 2
 
     Returns:
-        String describing the game mode
+        Game mode description
     """
     if player_1_type == "human" and player_2_type == "human":
         return "human vs human"
@@ -150,51 +73,56 @@ def get_game_mode(player_1_type, player_2_type):
 
 def main():
     """Main entry point for the game."""
-    # Setup game options
-    options = setup_game_options()
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO, 
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
 
-    # Create interface based on user selection
-    interface = None
-    if options["interface"] == "pygame":
-        try:
-            # Only import pygame when needed to avoid dependency if not used
-            from src.ui.pygame_interface import KulibratGUI
+    # Create configuration
+    config = GameConfig()
 
-            interface = KulibratGUI()
-            print("Using PyGame interface")
-        except ImportError:
-            print("PyGame not installed. Falling back to console interface.")
-            interface = ConsoleInterface()
-    else:
-        interface = ConsoleInterface()
+    # Retrieve game configuration
+    interface_type = config.get('ui.interface', 'console')
+    player_1_type = config.get('players.player_1.type', 'human')
+    player_2_type = config.get('players.player_2.type', 'minimax')
+    player_1_color = config.get('players.player_1.color', 'black')
+    target_score = config.get('game.target_score', 5)
 
-    # Get player types and model paths
-    player_1_type = options[
-        "player_1_type"
-    ]  # Use underscore instead of hyphen (argparse converts hyphens to underscores)
-    player_2_type = options["player_2_type"]
+    # Create interface
+    interface = create_interface(interface_type)
 
-    az_model_1 = options["az_model_1"]
-    az_model_2 = options["az_model_2"]
-    az_simulations = options["az_simulations"]
-    target_score = options["target_score"]
+    # Validate and get game mode
+    game_mode = validate_player_configuration(player_1_type, player_2_type)
 
-    # Get player colors
+    # Determine player colors
     player_1_color = (
-        PlayerColor.BLACK if options["player_1_color"] == "black" else PlayerColor.RED
+        PlayerColor.BLACK if player_1_color == "black" else PlayerColor.RED
     )
     player_2_color = (
         PlayerColor.RED if player_1_color == PlayerColor.BLACK else PlayerColor.BLACK
     )
 
-    # Create players
-    player_1 = create_player(
-        player_1_type, player_1_color, interface, az_model_1, az_simulations, "Player 1"
-    )
+    # Create players using PlayerFactory
+    try:
+        player_1 = PlayerFactory.create_player(
+            player_type=player_1_type,
+            color=player_1_color,
+            interface=interface
+        )
 
-    player_2 = create_player(
-        player_2_type, player_2_color, interface, az_model_2, az_simulations, "Player 2"
-    )
+        player_2 = PlayerFactory.create_player(
+            player_type=player_2_type,
+            color=player_2_color,
+            interface=interface
+        )
+    except ValueError as e:
+        logging.error(f"Error creating players: {e}")
+        return
+
+    # Create game engine components
+    rules_engine = GameRules()
+    turn_manager = TurnManager(rules_engine)
 
     # Assign players to their correct roles (black or red)
     black_player = player_1 if player_1_color == PlayerColor.BLACK else player_2
@@ -202,56 +130,42 @@ def main():
 
     # Create game engine
     engine = GameEngine(
-        black_player=black_player,
-        red_player=red_player,
+        rules_engine=rules_engine,
+        turn_manager=turn_manager,
         interface=interface,
-        target_score=target_score,
-        ai_delay=1,
+        target_score=target_score
     )
 
-    # Get game mode
-    game_mode = get_game_mode(player_1_type, player_2_type)
-
     # Console interface welcome message
-    if options["interface"] == "console":
+    if interface_type == "console":
         print("\n=== WELCOME TO KULIBRAT ===")
         print(f"Game Mode: {game_mode}")
         print(f"Target Score: {target_score}")
-
-        # Show player 1 color and name
         print(f"Player 1 ({player_1_type}): {player_1_color.name}")
-
-        
-
-        # Show player 2 color and name
         print(f"Player 2 ({player_2_type}): {player_2_color.name}")
-
-        
-
         print("\nStarting game...")
-        print("")
         time.sleep(2)
 
     # Start the game
     play_again = True
-
     while play_again:
-        winner = engine.start_game()
+        # Start game with black and red players
+        winner = engine.start_game(black_player, red_player)
 
         # For console interface, ask if the player wants to play again
-        if options["interface"] == "console":
+        if interface_type == "console":
             play_again = (
                 input("\nDo you want to play again? (y/n): ").lower().startswith("y")
             )
         else:
-            # For PyGame interface, the play_again logic is handled in the show_winner method
+            # For PyGame interface, play_again logic is handled in show_winner method
             play_again = False
 
         if play_again:
             # Reset the game
             engine.reset_game()
 
-    if options["interface"] == "console":
+    if interface_type == "console":
         print("\nThanks for playing Kulibrat!")
 
 

@@ -1,0 +1,40 @@
+# Kulibrat Game Configuration
+
+# Game settings
+game:
+  board_rows: 4
+  board_cols: 3
+  initial_pieces: 4
+  target_score: 5
+  ai_delay: 1.0
+
+# User interface configuration
+ui:
+  interface: pygame
+  screen_width: 1024
+  screen_height: 800
+
+# Player configuration
+players:
+  player_1:
+    type: human  # Options: human, minimax, random, mcts
+    color: black
+  player_2:
+    type: minimax  # Options: human, minimax, random, mcts
+    color: red
+
+# AI Strategies Configuration
+strategies:
+  minimax:
+    max_depth: 4
+    use_alpha_beta: true
+    # heuristic: Add param to choose specific heuristic
+     
+  
+  mcts:
+    simulation_time: 2.0
+    max_iterations: 20000
+    exploration_weight: 1.41
+    num_threads: 4
+  
+  random: {}
