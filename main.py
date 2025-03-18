@@ -27,7 +27,6 @@ from typing import Any, Dict
 
 from src.core.game_engine import GameEngine
 from src.core.player_color import PlayerColor
-from src.players.ai.alphazero_player import AlphaZeroPlayer
 from src.players.ai.mcts_strategy import MCTSStrategy
 from src.players.ai.minimax_strategy import MinimaxStrategy
 from src.players.ai.random_strategy import RandomStrategy
@@ -54,16 +53,16 @@ def setup_game_options() -> Dict[str, Any]:
 
     parser.add_argument(
         "--player-1-type",
-        choices=["human", "minimax", "random", "mcts", "alphazero"],
+        choices=["human", "minimax", "random", "mcts"],
         default="human",
-        help="Player 1 type (human, minimax, random, mcts, alphazero)",
+        help="Player 1 type (human, minimax, random, mcts)",
     )
 
     parser.add_argument(
         "--player-2-type",
-        choices=["human", "minimax", "random", "mcts", "alphazero"],
+        choices=["human", "minimax", "random", "mcts"],
         default="minimax",
-        help="Player 2 type (human, minimax, random, mcts, alphazero)",
+        help="Player 2 type (human, minimax, random, mcts)",
     )
 
     parser.add_argument(
@@ -77,24 +76,7 @@ def setup_game_options() -> Dict[str, Any]:
         "--target-score", type=int, default=5, help="Score needed to win the game"
     )
 
-    parser.add_argument(
-        "--az-model-1",
-        default="models/alphazero_model_best.pt",
-        help="Path to the trained AlphaZero model file if using AlphaZero as player 1",
-    )
-
-    parser.add_argument(
-        "--az-model-2",
-        default="models/alphazero_model_best.pt",
-        help="Path to the trained AlphaZero model file if using AlphaZero as player 2",
-    )
-
-    parser.add_argument(
-        "--az-simulations",
-        type=int,
-        default=800,
-        help="Number of MCTS simulations for AlphaZero players",
-    )
+    
 
     return vars(parser.parse_args())
 
@@ -103,8 +85,6 @@ def create_player(
     player_type,
     player_color,
     interface,
-    az_model_path=None,
-    az_simulations=800,
     player_name=None,
 ):
     """
@@ -141,39 +121,10 @@ def create_player(
             color=player_color, strategy=RandomStrategy(), name="Random"
         )
 
-    elif player_type == "alphazero":
-        return AlphaZeroPlayer(
-            color=player_color,
-            model_path=az_model_path,
-            n_simulations=az_simulations,
-            exploration_rate=0,
-            temperature=0.1,
-            name=player_name or "AlphaZero",
-        )
+   
     else:
         raise ValueError(f"Invalid player type: {player_type}")
 
-
-def check_alphazero_model(model_path, player_type, player_num):
-    """
-    Check if the AlphaZero model file exists if AlphaZero player type is selected.
-
-    Args:
-        model_path: Path to the AlphaZero model file
-        player_type: Type of player
-        player_num: Player number (1 or 2)
-
-    Returns:
-        True if model exists or if player type is not AlphaZero, False otherwise
-    """
-    if player_type == "alphazero":
-        if not os.path.exists(model_path):
-            print(f"Error: AlphaZero model file '{model_path}' not found.")
-            print(
-                f"You can train a model using train_alphazero.py or specify a different model with --az-model-{player_num}."
-            )
-            return False
-    return True
 
 
 def get_game_mode(player_1_type, player_2_type):
@@ -236,12 +187,6 @@ def main():
         PlayerColor.RED if player_1_color == PlayerColor.BLACK else PlayerColor.BLACK
     )
 
-    # Check if AlphaZero model files exist and are valid if using AlphaZero
-    if not check_alphazero_model(
-        az_model_1, player_1_type, 1
-    ) or not check_alphazero_model(az_model_2, player_2_type, 2):
-        return  # Exit the program if models are not available
-
     # Create players
     player_1 = create_player(
         player_1_type, player_1_color, interface, az_model_1, az_simulations, "Player 1"
@@ -276,16 +221,12 @@ def main():
         # Show player 1 color and name
         print(f"Player 1 ({player_1_type}): {player_1_color.name}")
 
-        if player_1_type == "alphazero":
-            print(f"AlphaZero Model: {az_model_1}")
-            print(f"MCTS Simulations: {az_simulations}")
+        
 
         # Show player 2 color and name
         print(f"Player 2 ({player_2_type}): {player_2_color.name}")
 
-        if player_2_type == "alphazero":
-            print(f"AlphaZero Model: {az_model_2}")
-            print(f"MCTS Simulations: {az_simulations}")
+        
 
         print("\nStarting game...")
         print("")
