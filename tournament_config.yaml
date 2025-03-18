@@ -1,0 +1,41 @@
+# Kulibrat Tournament Configuration
+
+# Tournament-wide settings
+tournament:
+  matches_per_pairing: 5  # Number of matches between each pair of players
+  target_score: 5  # Score needed to win a match
+  max_turns: 50  # Maximum turns before declaring a draw
+
+# Player configurations
+players:
+  # Random strategy player
+  - name: Random
+    type: random
+
+  # Minimax players with different depths
+  - name: Minimax-Depth4
+    type: minimax
+    depth: 4
+    use_alpha_beta: true
+
+  - name: Minimax-Depth6
+    type: minimax
+    depth: 6
+    use_alpha_beta: true
+
+  # MCTS players with different simulation times
+  - name: MCTS-0.5s
+    type: mcts
+    simulation_time: 0.5
+    max_iterations: 30000
+
+  - name: MCTS-2.5s
+    type: mcts
+    simulation_time: 2.5
+    max_iterations: 30000
+
+# Output configuration
+output:
+  results_dir: tournament_results
+  save_csv: true
+  save_plots: true
