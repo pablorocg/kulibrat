@@ -96,10 +96,21 @@ class PlayerFactory:
             
             # Create strategy with configuration
             strategy_class = cls._ai_strategies[player_type]
-            strategy_kwargs = {
-                k: v for k, v in strategy_config.items() 
-                if k in strategy_class.__init__.__code__.co_varnames
-            }
+            
+            # Special handling for minimax to support heuristic configuration
+            if player_type == 'minimax':
+                strategy_kwargs = {
+                    'max_depth': strategy_config.get('max_depth', 4),
+                    'use_alpha_beta': strategy_config.get('use_alpha_beta', True),
+                    'heuristic': strategy_config.get('heuristic', 'strategic')
+                }
+            else:
+                # For other strategies
+                strategy_kwargs = {
+                    k: v for k, v in strategy_config.items() 
+                    if k in strategy_class.__init__.__code__.co_varnames
+                }
+                
             strategy = strategy_class(**strategy_kwargs)
             
             return SimpleAIPlayer(color, strategy)

@@ -62,7 +62,8 @@ class AIPlayerFactory:
                     color=PlayerColor.BLACK,  # Will be set later
                     strategy=MinimaxStrategy(
                         max_depth=player_config.get('depth', 4),
-                        use_alpha_beta=player_config.get('use_alpha_beta', True)
+                        use_alpha_beta=player_config.get('use_alpha_beta', True),
+                        heuristic=player_config.get('heuristic', 'strategic')
                     ),
                     name=name
                 )

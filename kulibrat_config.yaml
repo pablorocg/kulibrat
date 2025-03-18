@@ -28,7 +28,7 @@ strategies:
   minimax:
     max_depth: 4
     use_alpha_beta: true
-    # heuristic: Add param to choose specific heuristic
+    heuristic: strategic  # Options: score_diff, advanced, aggressive, defensive, strategic
      
   
   mcts:
