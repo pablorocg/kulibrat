@@ -2,13 +2,13 @@
 Game state representation for Kulibrat, optimized for performance.
 """
 
-import numpy as np
-from typing import List, Optional, Tuple, Dict, Set, FrozenSet, Any
-from functools import lru_cache
+from typing import List, Optional, Tuple
 
-from src.core.player_color import PlayerColor
+import numpy as np
+
 from src.core.move import Move
 from src.core.move_type import MoveType
+from src.core.player_color import PlayerColor
 
 
 class GameState:
@@ -167,6 +167,9 @@ class GameState:
         if success:
             # Clear the move cache since the board state changed
             self._valid_moves_cache = {}
+            
+            # NOTE: DO NOT SWITCH PLAYERS HERE - this will be done by TurnManager
+            # to ensure proper turn flow and skipping
             
         return success
 

@@ -8,6 +8,7 @@ from typing import Callable
 
 from src.core.game_state import GameState
 from src.core.player_color import PlayerColor
+from src.core.move import MoveType
 
 
 class HeuristicRegistry:
@@ -90,6 +91,170 @@ def score_diff_heuristic(state: GameState, player_color: PlayerColor) -> float:
             return -1000.0  # Loss
             
     return score_diff * 100.0
+
+
+@HeuristicRegistry.register("advanced_minimax_optim")
+def advanced_minimax_optim_heuristic(state: GameState, player_color: PlayerColor) -> float:
+    """
+    Optimized heuristic based on tournament results analysis.
+    
+    Args:
+        state: Game state to evaluate
+        player_color: Player to evaluate for
+        
+    Returns:
+        Evaluation score
+    """
+    # Check for terminal state
+    if state.is_game_over():
+        winner = state.get_winner()
+        if winner == player_color:
+            return 1000.0  # Win
+        elif winner is None:
+            return 0.0  # Draw
+        else:
+            return -1000.0  # Loss
+
+    # Component weights - adjusted based on tournament results
+    W1 = 15.0  # Increased score difference weight (similar to Minimax-Score)
+    W2 = 2.5   # Slightly reduced progress weight
+    W3 = 4.0   # Opponent blocking weight
+    W4 = 2.0   # Increased mobility weight
+    W5 = 2.0   # Jump opportunity weight (new - to encourage more jumps)
+    
+    opponent_color = player_color.opposite()
+    
+    # 1. Score difference (w₁·ΔScore)
+    score_diff = state.scores[player_color] - state.scores[opponent_color]
+    score_component = W1 * score_diff
+    
+    # 2. Progress (w₂·ΣProgreso)
+    progress_score = 0.0
+    player_start_row = 0 if player_color == PlayerColor.BLACK else state.BOARD_ROWS - 1
+    opponent_start_row = state.BOARD_ROWS - 1 if player_color == PlayerColor.BLACK else 0
+    
+    # Calculate progress for player's pieces
+    for row in range(state.BOARD_ROWS):
+        for col in range(state.BOARD_COLS):
+            if state.board[row, col] == player_color.value:
+                # Progress is measured by distance from start row
+                if player_color == PlayerColor.BLACK:
+                    progress = row  # BLACK wants to move down (increase row)
+                else:
+                    progress = state.BOARD_ROWS - 1 - row  # RED wants to move up (decrease row)
+                
+                # Bonus for advancing pieces
+                if (player_color == PlayerColor.BLACK and row >= state.BOARD_ROWS // 2) or \
+                   (player_color == PlayerColor.RED and row < state.BOARD_ROWS // 2):
+                    progress *= 1.2  # Lower bonus - less aggressive than before
+                
+                # Bonus for being on opponent's start row (about to score)
+                if row == opponent_start_row:
+                    progress *= 2.5  # Higher bonus for scoring opportunity
+                    
+                progress_score += progress
+            
+            # Subtract opponent progress
+            elif state.board[row, col] == opponent_color.value:
+                if opponent_color == PlayerColor.BLACK:
+                    opponent_progress = row
+                else:
+                    opponent_progress = state.BOARD_ROWS - 1 - row
+                    
+                progress_score -= opponent_progress * 0.7  # Slightly less weight for opponent pieces
+    
+    progress_component = W2 * progress_score
+    
+    # 3. Opponent blocking (w₃·BloqueoOponente)
+    blocking_score = 0.0
+    
+    # Count opponent pieces that are blocked
+    for row in range(state.BOARD_ROWS):
+        for col in range(state.BOARD_COLS):
+            if state.board[row, col] == opponent_color.value:
+                # Check if piece is blocked (can't move forward)
+                forward_row = row + opponent_color.direction
+                if 0 <= forward_row < state.BOARD_ROWS and state.board[forward_row, col] != 0:
+                    blocking_score += 1.2  # Increased value for blocking opponent
+                
+                # Check if piece can't move diagonally
+                for diagonal_col in [col-1, col+1]:
+                    if 0 <= diagonal_col < state.BOARD_COLS:
+                        diagonal_row = row + opponent_color.direction
+                        if 0 <= diagonal_row < state.BOARD_ROWS and state.board[diagonal_row, diagonal_col] != 0:
+                            blocking_score += 0.6
+    
+    blocking_component = W3 * blocking_score
+    
+    # 4. Relative mobility (w₄·MovilidadRelativa)
+    # Save current player
+    current_player = state.current_player
+    
+    # Check player mobility
+    state.current_player = player_color
+    player_moves = state.get_valid_moves()
+    
+    # Check opponent mobility
+    state.current_player = opponent_color
+    opponent_moves = state.get_valid_moves()
+    
+    # Restore current player
+    state.current_player = current_player
+    
+    # Track jump and attack opportunities
+    jump_moves = sum(1 for m in player_moves if m.move_type == MoveType.JUMP)
+    attack_moves = sum(1 for m in player_moves if m.move_type == MoveType.ATTACK)
+    
+    # Calculate mobility ratio with emphasis on jumps
+    mobility_ratio = 0
+    if len(player_moves) + len(opponent_moves) > 0:
+        mobility_ratio = (len(player_moves) - len(opponent_moves)) / (len(player_moves) + len(opponent_moves))
+    
+    mobility_component = W4 * mobility_ratio * 10  # Scale to similar magnitude as other components
+    
+    # 5. Jump opportunity component (new)
+    jump_component = W5 * jump_moves
+    
+    # Final evaluation
+    evaluation = (
+        score_component + 
+        progress_component + 
+        blocking_component + 
+        mobility_component + 
+        jump_component
+    )
+    
+    # Special case: opponent has no moves
+    if len(opponent_moves) == 0 and len(player_moves) > 0:
+        evaluation += 20  # Bonus for locking opponent
+    
+    # Special case: we have no moves
+    if len(player_moves) == 0 and len(opponent_moves) > 0:
+        evaluation -= 20  # Penalty for being locked
+    
+    # Special case: defensive bonus when ahead
+    if score_diff > 0:
+        # When ahead, value defensive moves more
+        evaluation += attack_moves * 1.5  # Attacking is good defense
+        
+    # Special case: more aggressive when behind
+    if score_diff < 0:
+        # When behind, be more aggressive
+        evaluation += jump_moves * 2.0  # Extra weight for jumps
+        evaluation += len(player_moves) * 0.5  # Value having options
+    
+    return evaluation
+
+
+
+
+
+
+
+
+
+
+
 
 
 # Advanced heuristic considering piece positioning

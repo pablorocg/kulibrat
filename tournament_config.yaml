@@ -2,9 +2,9 @@
 
 # Tournament-wide settings
 tournament:
-  matches_per_pairing: 3  # Number of matches between each pair of players
+  matches_per_pairing: 5  # Number of matches between each pair of players
   target_score: 5  # Score needed to win a match
-  max_turns: 50  # Maximum turns before declaring a draw
+  max_turns: 100  # Maximum turns before declaring a draw
 
 # Player configurations
 players:
@@ -15,39 +15,46 @@ players:
   # Minimax players with different heuristics
   - name: Minimax-Score
     type: minimax
-    depth: 4
+    depth: 8
     use_alpha_beta: true
     heuristic: score_diff
 
   - name: Minimax-Advanced
     type: minimax
-    depth: 4
+    depth: 8
     use_alpha_beta: true
     heuristic: advanced
 
-  - name: Minimax-Aggressive
+  # Enhanced Minimax strategy optimized for Kulibrat
+  - name: Minimax-Advanced-Optim
     type: minimax
-    depth: 4
+    depth: 8  # Increased base depth
     use_alpha_beta: true
-    heuristic: aggressive
+    heuristic: advanced_minimax_optim
 
-  - name: Minimax-Defensive
-    type: minimax
-    depth: 4
-    use_alpha_beta: true
-    heuristic: defensive
+  # - name: Minimax-Aggressive
+  #   type: minimax
+  #   depth: 4
+  #   use_alpha_beta: true
+  #   heuristic: aggressive
 
-  - name: Minimax-Strategic
-    type: minimax
-    depth: 4
-    use_alpha_beta: true
-    heuristic: strategic
+  # - name: Minimax-Defensive
+  #   type: minimax
+  #   depth: 4
+  #   use_alpha_beta: true
+  #   heuristic: defensive
+
+  # - name: Minimax-Strategic
+  #   type: minimax
+  #   depth: 4
+  #   use_alpha_beta: true
+  #   heuristic: strategic
 
   # MCTS players with different simulation times
-  - name: MCTS-1.5s
-    type: mcts
-    simulation_time: 1.5
-    max_iterations: 30000
+  # - name: MCTS-1.5s
+  #   type: mcts
+  #   simulation_time: 1.5
+  #   max_iterations: 30000
 
 # Output configuration
 output:

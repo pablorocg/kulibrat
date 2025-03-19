@@ -43,33 +43,44 @@ class TurnManager:
         """
         # Log turn start
         self.logger.info(f"Processing turn for {player.color}")
+        
+        # Create a copy of the game state to modify
+        new_state = game_state.copy()
+        
+        # Ensure the current_player is set correctly
+        if new_state.current_player != player.color:
+            self.logger.warning(f"Current player mismatch. Expected {player.color}, got {new_state.current_player}. Correcting.")
+            new_state.current_player = player.color
 
         # If no moves are available
-        valid_moves = game_state.get_valid_moves()
+        valid_moves = new_state.get_valid_moves()
         if not valid_moves:
             self.logger.info(f"No valid moves for {player.color}")
-            return self._handle_no_moves(game_state)
+            return self._handle_no_moves(new_state)
 
         # If no move provided but moves are available
         if move is None:
             self.logger.warning(f"No move selected for {player.color}")
-            return game_state
+            return new_state
 
         # Validate the move
-        if not self.rules_engine.validate_move(game_state, move):
+        if not self.rules_engine.validate_move(new_state, move):
             error_msg = f"Invalid move for {player.color}: {move}"
             self.logger.error(error_msg)
             raise ValueError(error_msg)
 
-        # Create a copy of the game state to modify
-        new_state = game_state.copy()
-
         # Apply the move
-        new_state.apply_move(move)
+        success = new_state.apply_move(move)
+        if not success:
+            error_msg = f"Failed to apply move: {move}"
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)
+        
+        # Explicitly switch to the next player after a successful move
+        new_state.current_player = new_state.current_player.opposite()
 
         # Notify player about the move
-        for other_player in [p for p in [player] if p is not None]:
-            other_player.notify_move(move, new_state)
+        player.notify_move(move, new_state)
 
         # Log move details
         self.logger.info(f"Move applied: {move}")
@@ -92,6 +103,6 @@ class TurnManager:
         # Switch to the other player
         new_state.current_player = new_state.current_player.opposite()
 
-        self.logger.info(f"No moves for {game_state.current_player}. Skipping turn.")
+        self.logger.info(f"No moves for {game_state.current_player}. Switching to {new_state.current_player}.")
 
         return new_state
