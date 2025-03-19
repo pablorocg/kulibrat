@@ -2,7 +2,16 @@
 Tournament module for evaluating Kulibrat AI strategies.
 """
 
+from src.tournament.runner import TournamentRunner
 from src.tournament.evaluator import TournamentEvaluator
-from src.tournament.runner import run_tournament
+from src.tournament.factory import AIPlayerFactory
+from src.tournament.match import TournamentMatch
+from src.tournament.config import TournamentConfig
 
-__all__ = ["TournamentEvaluator", "run_tournament"]
+__all__ = [
+    "TournamentRunner", 
+    "TournamentEvaluator", 
+    "AIPlayerFactory", 
+    "TournamentMatch", 
+    "TournamentConfig"
+]

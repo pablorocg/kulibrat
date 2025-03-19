@@ -6,9 +6,7 @@ This module contains different evaluation functions that can be used with the Mi
 
 from typing import Callable
 
-from src.core.game_state import GameState
-from src.core.player_color import PlayerColor
-from src.core.move import MoveType
+from src.core import GameState, MoveType, PlayerColor
 
 
 class HeuristicRegistry:

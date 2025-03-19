@@ -22,11 +22,13 @@ class TurnManager:
         """
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
-        
+
         # Use provided rules engine or default
         self.rules_engine = rules_engine or GameRules()
 
-    def process_turn(self, game_state: GameState, player: Player, move: Optional[Move] = None) -> GameState:
+    def process_turn(
+        self, game_state: GameState, player: Player, move: Optional[Move] = None
+    ) -> GameState:
         """
         Process a player's turn, including move validation and application.
 
@@ -43,13 +45,15 @@ class TurnManager:
         """
         # Log turn start
         self.logger.info(f"Processing turn for {player.color}")
-        
+
         # Create a copy of the game state to modify
         new_state = game_state.copy()
-        
+
         # Ensure the current_player is set correctly
         if new_state.current_player != player.color:
-            self.logger.warning(f"Current player mismatch. Expected {player.color}, got {new_state.current_player}. Correcting.")
+            self.logger.warning(
+                f"Current player mismatch. Expected {player.color}, got {new_state.current_player}. Correcting."
+            )
             new_state.current_player = player.color
 
         # If no moves are available
@@ -75,7 +79,7 @@ class TurnManager:
             error_msg = f"Failed to apply move: {move}"
             self.logger.error(error_msg)
             raise ValueError(error_msg)
-        
+
         # Explicitly switch to the next player after a successful move
         new_state.current_player = new_state.current_player.opposite()
 
@@ -103,6 +107,8 @@ class TurnManager:
         # Switch to the other player
         new_state.current_player = new_state.current_player.opposite()
 
-        self.logger.info(f"No moves for {game_state.current_player}. Switching to {new_state.current_player}.")
+        self.logger.info(
+            f"No moves for {game_state.current_player}. Switching to {new_state.current_player}."
+        )
 
         return new_state

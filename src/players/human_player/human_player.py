@@ -1,12 +1,6 @@
-"""
-Human player implementation for the Kulibrat game.
-"""
-
 from typing import Optional
 
-from src.core.game_state import GameState
-from src.core.move import Move
-from src.core.player_color import PlayerColor
+from src.core import GameState, Move, PlayerColor
 from src.players.player import Player
 from src.ui.game_interface import GameInterface
 
@@ -14,9 +8,7 @@ from src.ui.game_interface import GameInterface
 class HumanPlayer(Player):
     """Human player that gets moves via a game interface."""
 
-    def __init__(
-        self, color: PlayerColor, interface: GameInterface, name: str = None
-    ):
+    def __init__(self, color: PlayerColor, interface: GameInterface, name: str = None):
         """
         Initialize a human player.
 
@@ -25,12 +17,8 @@ class HumanPlayer(Player):
             interface: UI interface to get moves from the player
             name: Optional custom name for the player
         """
-        super().__init__(color)
+        super().__init__(color, name or f"Human {color.name}")
         self.interface = interface
-        if name:
-            self.name = name
-        else:
-            self.name = f"Human {color.name}"
 
     def get_move(self, game_state: GameState) -> Optional[Move]:
         """
@@ -48,3 +36,6 @@ class HumanPlayer(Player):
             return None
 
         return self.interface.get_human_move(game_state, self.color, valid_moves)
+    
+
+

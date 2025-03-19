@@ -1,10 +1,11 @@
-# src/core/game_rules.py
+"""
+Game rules for Kulibrat.
+"""
+
 import logging
-from typing import Optional
 
 from src.core.game_state import GameState
 from src.core.move import Move
-from src.core.player_color import PlayerColor
 from src.core.move_type import MoveType
 
 
@@ -32,8 +33,14 @@ class GameRules:
             Boolean indicating if the move is valid
         """
         # Validate current player
-        if move.move_type != MoveType.INSERT and game_state.board[move.start_pos[0], move.start_pos[1]] != game_state.current_player.value:
-            self.logger.warning(f"Move validation failed: Piece at start position does not belong to current player")
+        if (
+            move.move_type != MoveType.INSERT
+            and game_state.board[move.start_pos[0], move.start_pos[1]]
+            != game_state.current_player.value
+        ):
+            self.logger.warning(
+                "Move validation failed: Piece at start position does not belong to current player"
+            )
             return False
 
         # Move type specific validation
@@ -46,7 +53,7 @@ class GameRules:
                 return self._validate_attack_move(game_state, move)
             elif move.move_type == MoveType.JUMP:
                 return self._validate_jump_move(game_state, move)
-            
+
             self.logger.warning(f"Unknown move type: {move.move_type}")
             return False
 
@@ -112,7 +119,10 @@ class GameRules:
             return False
 
         # Check destination is empty or off the board
-        if 0 <= end_row < game_state.BOARD_ROWS and 0 <= end_col < game_state.BOARD_COLS:
+        if (
+            0 <= end_row < game_state.BOARD_ROWS
+            and 0 <= end_col < game_state.BOARD_COLS
+        ):
             if game_state.board[end_row, end_col] != 0:
                 self.logger.warning("Destination square is not empty")
                 return False
@@ -180,8 +190,10 @@ class GameRules:
         current_row = start_row + direction
 
         # Count opponent pieces in the line
-        while (0 <= current_row < game_state.BOARD_ROWS and 
-               game_state.board[current_row, start_col] == opponent.value):
+        while (
+            0 <= current_row < game_state.BOARD_ROWS
+            and game_state.board[current_row, start_col] == opponent.value
+        ):
             line_length += 1
             current_row += direction
 

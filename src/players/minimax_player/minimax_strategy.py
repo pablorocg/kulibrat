@@ -5,382 +5,19 @@ advanced optimizations including transposition tables and move ordering.
 
 import random
 import time
-from typing import Optional, Tuple, Dict, Any, List
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 
-from src.core.game_state import GameState
-from src.core.move import Move
-from src.core.move_type import MoveType
-from src.core.player_color import PlayerColor
-from src.players.ai.ai_strategy import AIStrategy
-from src.players.ai.heuristics import HeuristicRegistry
+from src.core import GameState, Move, MoveType, PlayerColor
+from src.players.player import Player
+from players.minimax_player.heuristics import HeuristicRegistry
+from src.players.minimax_player.transposition_table import TranspositionTable
+from src.players.minimax_player.move_ordering import MoveOrdering
+from src.players.minimax_player.zobrist_hashing import ZobristHashing
 
 
-class TranspositionTable:
-    """Hash table for storing evaluated positions to avoid recalculating."""
-    
-    # Node types for transposition table
-    EXACT = 0    # Exact evaluation
-    ALPHA = 1    # Upper bound (alpha cutoff)
-    BETA = 2     # Lower bound (beta cutoff)
-    
-    def __init__(self, max_size: int = 1000000):
-        """
-        Initialize the transposition table.
-        
-        Args:
-            max_size: Maximum number of entries in the table
-        """
-        self.max_size = max_size
-        self.table = {}
-        self.hits = 0
-        self.stores = 0
-    
-    def store(self, zobrist_hash: int, depth: int, value: float, node_type: int, best_move: Optional[Move] = None):
-        """
-        Store a position evaluation in the table.
-        
-        Args:
-            zobrist_hash: Zobrist hash of the position
-            depth: Depth of the search
-            value: Evaluation value
-            node_type: Type of node (EXACT, ALPHA, BETA)
-            best_move: Best move found at this position
-        """
-        if len(self.table) >= self.max_size:
-            # Improved replacement strategy - prioritize keeping deeper evaluations and exact nodes
-            keys_to_check = random.sample(list(self.table.keys()), min(100, len(self.table)))
-            best_key_to_replace = None
-            lowest_priority = float('inf')
-            
-            for key in keys_to_check:
-                entry = self.table[key]
-                # Calculate priority: depth + bonus for exact nodes
-                priority = entry['depth'] + (2 if entry['type'] == self.EXACT else 0)
-                if priority < lowest_priority:
-                    lowest_priority = priority
-                    best_key_to_replace = key
-            
-            if best_key_to_replace:
-                self.table.pop(best_key_to_replace)
-            else:
-                # Fallback to removing a random entry
-                self.table.pop(random.choice(list(self.table.keys())))
-            
-        self.table[zobrist_hash] = {
-            'depth': depth,
-            'value': value,
-            'type': node_type,
-            'best_move': best_move,
-        }
-        self.stores += 1
-    
-    def lookup(self, zobrist_hash: int) -> Optional[Dict[str, Any]]:
-        """
-        Look up a position in the table.
-        
-        Args:
-            zobrist_hash: Zobrist hash of the position
-            
-        Returns:
-            Entry data or None if not found
-        """
-        entry = self.table.get(zobrist_hash)
-        if entry:
-            self.hits += 1
-        return entry
-    
-    def get_hit_rate(self) -> float:
-        """
-        Calculate the cache hit rate.
-        
-        Returns:
-            Hit rate as a percentage
-        """
-        lookups = self.hits + (len(self.table) - self.stores)
-        return self.hits / lookups * 100 if lookups > 0 else 0
-
-
-class ZobristHashing:
-    """
-    Implements Zobrist hashing for game states.
-    """
-    
-    def __init__(self, rows: int = 4, cols: int = 3, piece_types: int = 3):
-        """
-        Initialize Zobrist hashing with random bitstrings.
-        
-        Args:
-            rows: Number of rows on the board
-            cols: Number of columns on the board
-            piece_types: Number of different piece types (including empty)
-        """
-        # Initialize random bitstrings for each piece at each position
-        np.random.seed(42)  # For reproducibility
-        self.piece_position = np.random.randint(
-            0, 2**64 - 1, 
-            size=(rows, cols, piece_types), 
-            dtype=np.uint64
-        )
-        
-        # Hash for player to move (BLACK=1, RED=-1, we'll use index 0 for BLACK, 1 for RED)
-        self.player_to_move = np.random.randint(0, 2**64 - 1, size=2, dtype=np.uint64)
-        
-        # Hash for pieces in hand (0-4 pieces for each player)
-        self.pieces_in_hand = {
-            PlayerColor.BLACK: np.random.randint(0, 2**64 - 1, size=5, dtype=np.uint64),
-            PlayerColor.RED: np.random.randint(0, 2**64 - 1, size=5, dtype=np.uint64)
-        }
-        
-        # Hash for scores (0-10 for each player)
-        self.scores = {
-            PlayerColor.BLACK: np.random.randint(0, 2**64 - 1, size=11, dtype=np.uint64),
-            PlayerColor.RED: np.random.randint(0, 2**64 - 1, size=11, dtype=np.uint64)
-        }
-        
-    def compute_hash(self, state: GameState) -> int:
-        """
-        Compute the Zobrist hash for a game state.
-        
-        Args:
-            state: Game state to hash
-            
-        Returns:
-            64-bit Zobrist hash
-        """
-        h = 0
-        
-        # Hash the board position
-        for row in range(state.BOARD_ROWS):
-            for col in range(state.BOARD_COLS):
-                piece = state.board[row, col]
-                # Map piece values to indices (0: empty, 1: BLACK, 2: RED)
-                piece_idx = 0  # Default empty
-                if piece == PlayerColor.BLACK.value:
-                    piece_idx = 1
-                elif piece == PlayerColor.RED.value:
-                    piece_idx = 2
-                    
-                h ^= self.piece_position[row, col, piece_idx]
-        
-        # Hash the player to move
-        player_idx = 0 if state.current_player == PlayerColor.BLACK else 1
-        h ^= self.player_to_move[player_idx]
-        
-        # Hash pieces in hand
-        for player in [PlayerColor.BLACK, PlayerColor.RED]:
-            pieces = min(state.pieces_off_board[player], 4)  # Clamp to 0-4
-            h ^= self.pieces_in_hand[player][pieces]
-        
-        # Hash scores
-        for player in [PlayerColor.BLACK, PlayerColor.RED]:
-            score = min(state.scores[player], 10)  # Clamp to 0-10
-            h ^= self.scores[player][score]
-            
-        return h
-
-
-class MoveOrdering:
-    """
-    Implements move ordering to improve alpha-beta pruning efficiency.
-    """
-    
-    def __init__(self):
-        """Initialize move ordering with history heuristic."""
-        # History heuristic table
-        self.history_table = {}
-        
-        # Killer moves storage (two killer moves per ply depth)
-        self.killer_moves = {}
-        for i in range(20):  # Support up to depth 20
-            self.killer_moves[i] = [None, None]
-        
-        # Move type priorities (higher is better)
-        self.move_type_priority = {
-            MoveType.ATTACK: 4,    # Generally good to capture
-            MoveType.JUMP: 5,      # Bumped up - tournament showed underutilization
-            MoveType.DIAGONAL: 2,  # Regular moves
-            MoveType.INSERT: 1     # Insertions are default
-        }
-    
-    def order_moves(self, moves: List[Move], tt_move: Optional[Move] = None, depth: int = 0, state: Optional[GameState] = None) -> List[Move]:
-        """
-        Order moves to maximize alpha-beta pruning efficiency.
-        
-        Args:
-            moves: List of legal moves
-            tt_move: Best move from transposition table, if available
-            depth: Current search depth
-            state: Current game state (optional, for more context-aware ordering)
-            
-        Returns:
-            Ordered list of moves
-        """
-        # Score each move
-        move_scores = []
-        
-        # Get current player color for context-aware ordering
-        current_player = state.current_player if state else None
-        
-        for move in moves:
-            score = 0
-            
-            # Transposition table move gets highest priority
-            if tt_move and self._moves_equal(move, tt_move):
-                score += 10000
-            
-            # Killer move bonus (first killer gets higher priority)
-            killer1, killer2 = self.killer_moves.get(depth, [None, None])
-            if killer1 and self._moves_equal(move, killer1):
-                score += 9000
-            elif killer2 and self._moves_equal(move, killer2):
-                score += 8000
-            
-            # Move type priority
-            score += self.move_type_priority.get(move.move_type, 0) * 100
-            
-            # Context-aware scoring if state is provided
-            if state and current_player:
-                # Prioritize scoring moves
-                if self._is_scoring_move(move, current_player):
-                    score += 6000
-                
-                # Prioritize moves that block opponent's scoring opportunities
-                if move.move_type in [MoveType.ATTACK, MoveType.JUMP] and self._blocks_scoring(move, state):
-                    score += 3000
-                
-                # Add positional bonus for moves that advance pieces toward scoring
-                if move.end_pos and move.start_pos:
-                    if current_player == PlayerColor.BLACK and move.end_pos[0] > move.start_pos[0]:
-                        # BLACK advancing down
-                        score += 50 * move.end_pos[0]  # More advanced = higher score
-                    elif current_player == PlayerColor.RED and move.end_pos[0] < move.start_pos[0]:
-                        # RED advancing up
-                        score += 50 * (state.BOARD_ROWS - 1 - move.end_pos[0])
-            
-            # History heuristic
-            move_key = self._get_move_key(move)
-            score += self.history_table.get(move_key, 0)
-                
-            move_scores.append((move, score))
-        
-        # Sort by score (descending)
-        move_scores.sort(key=lambda x: x[1], reverse=True)
-        
-        # Return ordered moves
-        return [m[0] for m in move_scores]
-    
-    def update_history(self, move: Move, depth: int):
-        """
-        Update history heuristic.
-        
-        Args:
-            move: Move that caused a beta cutoff
-            depth: Search depth
-        """
-        move_key = self._get_move_key(move)
-        # Use depth^2 to give more weight to moves that cause cutoffs at deeper levels
-        self.history_table[move_key] = self.history_table.get(move_key, 0) + depth * depth
-    
-    def update_killer_move(self, move: Move, depth: int):
-        """
-        Update killer moves.
-        
-        Args:
-            move: Move that caused a beta cutoff
-            depth: Search depth
-        """
-        # Only store non-capturing moves as killer moves (better for Kulibrat)
-        if move.move_type in [MoveType.DIAGONAL, MoveType.INSERT, MoveType.JUMP]:
-            killer1, killer2 = self.killer_moves.get(depth, [None, None])
-            # Don't duplicate killer moves
-            if killer1 is None or not self._moves_equal(move, killer1):
-                self.killer_moves[depth] = [move, killer1]
-    
-    def _get_move_key(self, move: Move) -> str:
-        """
-        Convert a move to a unique string key for the history table.
-        
-        Args:
-            move: Move to convert
-            
-        Returns:
-            String key
-        """
-        return f"{move.move_type.name}:{move.start_pos}:{move.end_pos}"
-    
-    def _moves_equal(self, move1: Move, move2: Move) -> bool:
-        """
-        Check if two moves are equal (even if they are different objects).
-        
-        Args:
-            move1: First move
-            move2: Second move
-            
-        Returns:
-            True if moves are equal
-        """
-        return (move1.move_type == move2.move_type and 
-                move1.start_pos == move2.start_pos and 
-                move1.end_pos == move2.end_pos)
-                
-    def _is_scoring_move(self, move: Move, player_color: PlayerColor) -> bool:
-        """
-        Check if a move is a scoring move.
-        
-        Args:
-            move: Move to check
-            player_color: Player making the move
-            
-        Returns:
-            True if the move scores a point
-        """
-        if not move.end_pos or not move.start_pos:
-            return False
-            
-        # Diagonal moves from row 3 for BLACK or row 0 for RED can score
-        if move.move_type == MoveType.DIAGONAL:
-            if (player_color == PlayerColor.BLACK and move.start_pos[0] == 3 and 
-                (move.end_pos[0] >= 4 or move.end_pos[0] < 0)):
-                return True  # BLACK scoring
-            if (player_color == PlayerColor.RED and move.start_pos[0] == 0 and 
-                (move.end_pos[0] >= 4 or move.end_pos[0] < 0)):
-                return True  # RED scoring
-                
-        # Jump moves that land off the board can score
-        if move.move_type == MoveType.JUMP:
-            if move.end_pos[0] < 0 or move.end_pos[0] >= 4:
-                return True
-                
-        return False
-    
-    def _blocks_scoring(self, move: Move, state: GameState) -> bool:
-        """
-        Check if a move blocks opponent from scoring.
-        
-        Args:
-            move: Move to check
-            state: Current game state
-            
-        Returns:
-            True if the move blocks a potential score
-        """
-        if not move.end_pos or move.move_type not in [MoveType.ATTACK, MoveType.JUMP]:
-            return False
-            
-        opponent_color = state.current_player.opposite()
-        
-        # Check if the move prevents a scoring opportunity
-        # For BLACK opponent, check if we're removing a piece from row 3
-        # For RED opponent, check if we're removing a piece from row 0
-        if (opponent_color == PlayerColor.BLACK and move.end_pos[0] == 3) or \
-           (opponent_color == PlayerColor.RED and move.end_pos[0] == 0):
-            return True
-            
-        return False
-
-
-class MinimaxStrategy(AIStrategy):
+class MinimaxPlayer(Player):
     """
     Enhanced AI strategy using minimax algorithm with alpha-beta pruning, 
     transposition tables, and move ordering.
@@ -391,7 +28,7 @@ class MinimaxStrategy(AIStrategy):
         max_depth: int = 5, 
         use_alpha_beta: bool = True,
         heuristic: str = "strategic",
-        tt_size: int = 1000000
+        tt_size: int = 1000000, color, name
     ):
         """
         Initialize the minimax strategy.
@@ -402,6 +39,8 @@ class MinimaxStrategy(AIStrategy):
             heuristic: Name of the heuristic function to use
             tt_size: Size of the transposition table
         """
+        super().__init__(color, name)
+
         self.max_depth = max_depth
         self.use_alpha_beta = use_alpha_beta
         self.nodes_evaluated = 0
@@ -659,51 +298,9 @@ class MinimaxStrategy(AIStrategy):
         Returns:
             Adjusted search depth
         """
-        base_depth = self.max_depth
+        return self.max_depth
         
-        # Get score information
-        target_score = state.target_score
-        player_score = state.scores[player_color]
-        opponent_score = state.scores[player_color.opposite()]
-        score_diff = player_score - opponent_score
         
-        # Default adjustments
-        adjustment = 0
-        
-        # Early game - use lower depth
-        if self.turn_counter < self.early_game_threshold:
-            adjustment -= 1
-        
-        # Critical game states - increase depth
-        
-        # When player is close to winning
-        if player_score >= target_score - self.endgame_threshold:
-            adjustment += 2
-        
-        # When opponent is close to winning
-        if opponent_score >= target_score - self.endgame_threshold:
-            adjustment += 2
-            
-        # When score changed in the last move
-        if score_changed:
-            adjustment += 1
-            
-        # Close scores - increase depth to find advantage
-        if abs(score_diff) <= 1 and max(player_score, opponent_score) >= 2:
-            adjustment += 1
-            
-        # Check for critical positions
-        critical_position = self._is_critical_position(state, player_color)
-        if critical_position:
-            adjustment += 2
-            
-        # Limit maximum depth increase/decrease
-        adjustment = max(-2, min(adjustment, 3))
-        
-        # Apply adjustment to base depth
-        adjusted_depth = max(3, min(base_depth + adjustment, 8))
-        
-        return adjusted_depth
         
     def _is_critical_position(self, state: GameState, player_color: PlayerColor) -> bool:
         """

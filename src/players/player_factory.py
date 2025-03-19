@@ -5,11 +5,10 @@ from typing import Dict, Type, Optional, Any
 from src.core.player_color import PlayerColor
 from src.players.player import Player
 from src.players.human_player import HumanPlayer
-from src.players.ai.simple_ai_player import SimpleAIPlayer
-from src.players.ai.ai_strategy import AIStrategy
-from src.players.ai.minimax_strategy import MinimaxStrategy
-from src.players.ai.mcts_strategy import MCTSStrategy
-from src.players.ai.random_strategy import RandomStrategy
+from src.players.mcts_player import MCTSPlayer 
+from src.players.random_player import RandomPlayer
+from src.players.minimax_player import MinimaxPlayer
+
 from src.ui.game_interface import GameInterface
 from src.config.game_config import GameConfig
 
