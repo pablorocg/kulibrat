@@ -1,15 +1,14 @@
 """
-tournament factory
+Tournament factory for creating players for tournament evaluation.
 """
 
 from typing import Any, Dict
 import logging
 
-from src.players.ai.simple_ai_player import SimpleAIPlayer
-from src.players.ai.random_strategy import RandomStrategy
-from src.players.ai.minimax_strategy import MinimaxStrategy
-from src.players.ai.mcts_strategy import MCTSStrategy
 from src.core.player_color import PlayerColor
+from src.players.random_player import RandomPlayer
+from src.players.minimax_player import MinimaxPlayer
+from src.players.mcts_player import MCTSPlayer
 
 
 class AIPlayerFactory:
@@ -28,35 +27,32 @@ class AIPlayerFactory:
         """
         player_type = player_config['type']
         name = player_config.get('name', f'{player_type}-default')
+        
+        # Initialize with BLACK color - will be set properly in the tournament
+        color = PlayerColor.BLACK
 
         try:
             if player_type == 'random':
-                return SimpleAIPlayer(
-                    color=PlayerColor.BLACK,  # Will be set later
-                    strategy=RandomStrategy(),
-                    name=name
-                )
+                return RandomPlayer(color=color, name=name)
 
             elif player_type == 'minimax':
-                return SimpleAIPlayer(
-                    color=PlayerColor.BLACK,  # Will be set later
-                    strategy=MinimaxStrategy(
-                        max_depth=player_config.get('depth', 4),
-                        use_alpha_beta=player_config.get('use_alpha_beta', True),
-                        heuristic=player_config.get('heuristic', 'strategic'),
-                        tt_size=player_config.get('tt_size', 1000000)
-                    ),
-                    name=name
+                return MinimaxPlayer(
+                    color=color,
+                    name=name,
+                    max_depth=player_config.get('depth', 4),
+                    use_alpha_beta=player_config.get('use_alpha_beta', True),
+                    heuristic=player_config.get('heuristic', 'strategic'),
+                    tt_size=player_config.get('tt_size', 1000000)
                 )
 
             elif player_type == 'mcts':
-                return SimpleAIPlayer(
-                    color=PlayerColor.BLACK,  # Will be set later
-                    strategy=MCTSStrategy(
-                        simulation_time=player_config.get('simulation_time', 1.0),
-                        max_iterations=player_config.get('max_iterations', 15000)
-                    ),
-                    name=name
+                return MCTSPlayer(
+                    color=color,
+                    name=name,
+                    simulation_time=player_config.get('simulation_time', 1.0),
+                    max_iterations=player_config.get('max_iterations', 15000),
+                    exploration_weight=player_config.get('exploration_weight', 1.41),
+                    num_threads=player_config.get('num_threads', 4)
                 )
 
             else:

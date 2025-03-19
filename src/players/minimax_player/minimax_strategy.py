@@ -120,18 +120,11 @@ class MinimaxPlayer(Player):
         tt_move = tt_entry.get("best_move") if tt_entry else None
 
         self.turn_counter += 1
-        score_changed = (
-            game_state.scores[PlayerColor.BLACK]
-            != self.previous_scores[PlayerColor.BLACK]
-            or game_state.scores[PlayerColor.RED]
-            != self.previous_scores[PlayerColor.RED]
-        )
+        
         self.previous_scores = game_state.scores.copy()
 
         base_depth = self.max_depth
-        adjusted_depth = self._calculate_adaptive_depth(
-            game_state, self.color, score_changed
-        )
+        adjusted_depth = self.max_depth
         if adjusted_depth != base_depth:
             self.stats["adaptive_depth_adjustments"] += 1
 

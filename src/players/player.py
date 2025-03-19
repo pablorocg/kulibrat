@@ -36,6 +36,38 @@ class Player(ABC):
             A valid move or None if no move is possible
         """
         pass
+    
+    def setup(self, game_state: GameState) -> None:
+        """
+        Initialize the player with the game state.
+        
+        Args:
+            game_state: Initial game state
+        """
+        # Default implementation does nothing
+        pass
+    
+    def notify_move(self, move: Move, game_state: GameState) -> None:
+        """
+        Notify the player about a move that has been made.
+        
+        Args:
+            move: The move that was made
+            game_state: Updated game state after the move
+        """
+        # Default implementation does nothing
+        pass
+    
+    def game_over(self, game_state: GameState) -> None:
+        """
+        Notify the player that the game is over.
+        
+        Args:
+            game_state: Final game state
+        """
+        # Default implementation does nothing
+        pass
+    
 
 
 

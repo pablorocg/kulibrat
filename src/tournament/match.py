@@ -1,12 +1,16 @@
-""" """
+"""
+Tournament match implementation for running matches between AI players.
+"""
 
 import logging
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from src.core.game_state import GameState
+from src.core.move import Move
 from src.core.move_type import MoveType
 from src.core.player_color import PlayerColor
+from src.players.player import Player
 
 
 class TournamentMatch:
@@ -15,9 +19,9 @@ class TournamentMatch:
     def __init__(
         self,
         player1_name: str,
-        player1,
+        player1: Player,
         player2_name: str,
-        player2,
+        player2: Player,
         target_score: int = 5,
         max_turns: int = 300,
     ):
@@ -87,27 +91,32 @@ class TournamentMatch:
         # Initialize game state
         game_state = GameState(target_score=self.target_score)
 
+        # Setup players with initial game state
+        if hasattr(black_player, 'setup'):
+            black_player.setup(game_state)
+        if hasattr(red_player, 'setup'):
+            red_player.setup(game_state)
+
         # Track match progress
         turns = 0
         start_time = datetime.now()
-
+        
         # Record all moves for detailed analysis
         all_moves = []
 
-        while not game_state.is_game_over():  # and turns < self.max_turns
+        # Main game loop
+        while not game_state.is_game_over() and turns < self.max_turns:
             # Determine current player
             current_color = game_state.current_player
-            current_player = (
-                black_player if current_color == PlayerColor.BLACK else red_player
-            )
-            current_player_name = (
-                black_player_name
-                if current_color == PlayerColor.BLACK
-                else red_player_name
-            )
+            current_player = black_player if current_color == PlayerColor.BLACK else red_player
+            current_player_name = black_player_name if current_color == PlayerColor.BLACK else red_player_name
 
             # Get player move
-            move = current_player.get_move(game_state)
+            try:
+                move = current_player.get_move(game_state)
+            except Exception as e:
+                logging.error(f"Error getting move from {current_player_name}: {e}")
+                move = None
 
             if not move:
                 # Skip turn if no move possible
@@ -116,29 +125,23 @@ class TournamentMatch:
 
             # Apply move and track statistics
             if game_state.apply_move(move):
+                # Notify players about the move
+                if hasattr(black_player, 'notify_move'):
+                    black_player.notify_move(move, game_state)
+                if hasattr(red_player, 'notify_move'):
+                    red_player.notify_move(move, game_state)
+
                 # Track move types - ensure we're working with a dictionary
-                move_types_key = (
-                    "player1_move_types"
-                    if current_player_name == self.player1_name
-                    else "player2_move_types"
-                )
+                move_types_key = "player1_move_types" if current_player_name == self.player1_name else "player2_move_types"
                 move_types_dict = self.match_results[move_types_key]
-
-                # Explicitly check that we have a dictionary
-                if not isinstance(move_types_dict, dict):
-                    logging.warning(
-                        f"Expected dictionary for {move_types_key}, found {type(move_types_dict)}. Reinitializing."
-                    )
-                    move_types_dict = {m.name: 0 for m in MoveType}
-                    self.match_results[move_types_key] = move_types_dict
-
-                # Now safely update the move type count
+                
+                # Update the move type count
                 move_type_name = move.move_type.name
                 if move_type_name in move_types_dict:
                     move_types_dict[move_type_name] += 1
                 else:
                     move_types_dict[move_type_name] = 1
-
+                
                 # Record the move details
                 move_record = {
                     "turn": turns,
@@ -146,7 +149,7 @@ class TournamentMatch:
                     "color": current_color.name,
                     "move_type": move.move_type.name,
                     "start_pos": move.start_pos,
-                    "end_pos": move.end_pos,
+                    "end_pos": move.end_pos
                 }
                 all_moves.append(move_record)
 
@@ -167,24 +170,24 @@ class TournamentMatch:
         else:
             winner_name = None
 
+        # Notify players of game over
+        if hasattr(black_player, 'game_over'):
+            black_player.game_over(game_state)
+        if hasattr(red_player, 'game_over'):
+            red_player.game_over(game_state)
+
         # Update match results
-        self.match_results.update(
-            {
-                "winner": winner_name,
-                "score_p1": game_state.scores[PlayerColor.BLACK]
-                if not swap_colors
-                else game_state.scores[PlayerColor.RED],
-                "score_p2": game_state.scores[PlayerColor.RED]
-                if not swap_colors
-                else game_state.scores[PlayerColor.BLACK],
-                "turns": turns,
-                "total_time": match_duration,
-                "all_moves": all_moves,
-                "final_state": {
-                    "board": game_state.board.copy(),
-                    "scores": game_state.scores.copy(),
-                },
+        self.match_results.update({
+            "winner": winner_name,
+            "score_p1": game_state.scores[PlayerColor.BLACK] if not swap_colors else game_state.scores[PlayerColor.RED],
+            "score_p2": game_state.scores[PlayerColor.RED] if not swap_colors else game_state.scores[PlayerColor.BLACK],
+            "turns": turns,
+            "total_time": match_duration,
+            "all_moves": all_moves,
+            "final_state": {
+                "board": game_state.board.copy(),
+                "scores": game_state.scores.copy()
             }
-        )
+        })
 
         return self.match_results

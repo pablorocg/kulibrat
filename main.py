@@ -174,8 +174,10 @@ def main():
                 # Reset the game
                 engine.reset_game()
                 # Reset players
-                black_player.setup(engine.state)
-                red_player.setup(engine.state)
+                if hasattr(black_player, 'setup'):
+                    black_player.setup(engine.state)
+                if hasattr(red_player, 'setup'):
+                    red_player.setup(engine.state)
 
         if interface_type.lower() == "console":
             print("\nThanks for playing Kulibrat!")

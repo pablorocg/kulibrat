@@ -38,8 +38,8 @@ class TournamentRunner:
         self.logger = logging.getLogger(__name__)
         self.verbose = verbose
         
-        # Load configuration
-        self.config = TournamentConfig(config_path)
+        # Store configuration path
+        self.config_path = config_path
         
         # Tournament results storage
         self.results: List[Dict[str, Any]] = []
@@ -52,8 +52,11 @@ class TournamentRunner:
             List of tournament match results
         """
         try:
-            # Create tournament evaluator
-            tournament = TournamentEvaluator(self.config)
+            # Create tournament evaluator with the config path
+            if not self.config_path:
+                raise ValueError("Configuration path not provided")
+                
+            tournament = TournamentEvaluator(self.config_path)
             
             # Run tournament
             tournament.run_tournament()
