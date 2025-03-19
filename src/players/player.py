@@ -5,7 +5,9 @@ Abstract base class for all player types in Kulibrat.
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from src.core import GameState, Move, PlayerColor
+from src.core.game_state import GameState
+from src.core.move import Move
+from src.core.player_color import PlayerColor
 
 
 class Player(ABC):

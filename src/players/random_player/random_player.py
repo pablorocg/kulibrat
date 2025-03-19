@@ -5,7 +5,9 @@ Random move selection strategy for Kulibrat AI.
 import random
 from typing import Optional
 
-from src.core.game_state import GameState, Move, PlayerColor
+from src.core.game_state import GameState
+from src.core.move import Move
+from src.core.player_color import PlayerColor
 from src.players.player import Player
 
 class RandomPlayer(Player):

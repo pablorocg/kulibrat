@@ -1,5 +1,8 @@
 from typing import List, Optional
-from src.core import GameState, Move, PlayerColor, MoveType
+from src.core.game_state import GameState
+from src.core.move import Move
+from src.core.player_color import PlayerColor
+from src.core.move_type import MoveType
 
 
 

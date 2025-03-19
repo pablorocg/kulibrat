@@ -2,7 +2,8 @@ from typing import Optional
 import random
 import math
 
-from src.core import GameState, Move
+from src.core.game_state import GameState
+from src.core.move import Move
 
 
 class MCTSNode:

@@ -1,8 +1,8 @@
-from enum import Enum
-from typing import Tuple
 import numpy as np
 
-from src.core import GameState, PlayerColor
+from src.core.game_state import GameState
+
+from src.core.player_color import PlayerColor
 
 class ZobristHashing:
     """

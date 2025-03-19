@@ -1,7 +1,10 @@
 from typing import Optional
 
-from src.core import GameState, Move, PlayerColor
+from src.core.game_state import GameState
+from src.core.move import Move
+from src.core.player_color import PlayerColor
 from src.players.player import Player
+
 from src.ui.game_interface import GameInterface
 
 
