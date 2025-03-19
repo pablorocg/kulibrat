@@ -6,9 +6,9 @@ from typing import Any, Dict
 import logging
 
 from src.core.player_color import PlayerColor
-from src.players.random_player import RandomPlayer
-from src.players.minimax_player import MinimaxPlayer
-from src.players.mcts_player import MCTSPlayer
+from src.players.random_player.random_player import RandomPlayer
+from src.players.minimax_player.minimax_player import MinimaxPlayer
+from src.players.mcts_player.mcts_player import MCTSPlayer
 
 
 class AIPlayerFactory:

@@ -7,9 +7,10 @@ import logging
 import os
 import traceback
 from datetime import datetime
-from typing import List, Dict   
+from typing import List, Dict, Any, Optional
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import yaml
@@ -88,9 +89,7 @@ class TournamentEvaluator:
         current_match = 0
         matchup_results = defaultdict(list)  # For tracking head-to-head results
 
-        
-
-        progress = tqdm(total=total_matches)
+        progress = tqdm(total=total_matches, desc="Running Tournament")
 
         try:
             # Run matches between all player pairs, ensuring each player plays both colors
@@ -149,13 +148,13 @@ class TournamentEvaluator:
 
                             # Progress tracking
                             current_match += 1
-                            progress_percent = (current_match / total_matches) * 100
-                            print(f"Progress: {current_match}/{total_matches} matches completed ({progress_percent:.1f}%)")
-                            
-                            progress.update(1)  
+                            progress.update(1)
+
+                            # Save interim results every 10% of matches
+                            if current_match % max(1, total_matches // 10) == 0:
+                                self._save_interim_results(results_dir, current_match)
 
             # Save and analyze results
-            self._save_interim_results(results_dir, current_match)
             self._save_results(results_dir)
             self._analyze_matchups(matchup_results, results_dir)
             self._generate_visualizations(results_dir)
@@ -169,6 +168,8 @@ class TournamentEvaluator:
             except:
                 pass
             raise
+        finally:
+            progress.close()
 
     def _save_interim_results(self, results_dir: str, match_number: int):
         """
@@ -500,8 +501,113 @@ class TournamentEvaluator:
             matchup_df.to_csv(os.path.join(results_dir, 'matchup_statistics.csv'), index=False)
         except Exception as e:
             self.logger.error(f"Error saving matchup statistics: {e}")
-    
-    
+
+    def _create_matchup_visualization(self, player1: str, player2: str, matchup_stat: Dict, 
+                                     move_types_p1: Dict, move_types_p2: Dict, matchup_dir: str):
+        """
+        Create visualizations for a specific player matchup.
+        
+        Args:
+            player1: First player name
+            player2: Second player name
+            matchup_stat: Dictionary with matchup statistics
+            move_types_p1: Dictionary of move types for player 1
+            move_types_p2: Dictionary of move types for player 2
+            matchup_dir: Directory to save matchup visualizations
+        """
+        # Set up figure with 2x2 subplots
+        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+        fig.suptitle(f"Matchup Analysis: {player1} vs {player2}", fontsize=16)
+        
+        # 1. Win Distribution - Top Left
+        labels = [f"{player1} Wins", f"{player2} Wins", "Draws"]
+        sizes = [matchup_stat['player1_wins'], matchup_stat['player2_wins'], matchup_stat['draws']]
+        colors = [self.player_colors.get(player1, 'blue'), 
+                 self.player_colors.get(player2, 'red'), 
+                 'lightgray']
+        
+        axes[0, 0].pie(sizes, labels=labels, colors=colors, autopct='%1.1f%%', 
+                     shadow=False, startangle=90)
+        axes[0, 0].set_title("Win Distribution")
+        
+        # 2. Performance by Color - Top Right
+        colors = ['black', 'red']
+        player1_rates = [matchup_stat['player1_black_win_rate'], matchup_stat['player1_red_win_rate']]
+        player2_rates = [100 - matchup_stat['player1_black_win_rate'], 100 - matchup_stat['player1_red_win_rate']]
+        
+        width = 0.35
+        x = np.arange(len(colors))
+        
+        axes[0, 1].bar(x - width/2, player1_rates, width, label=player1, 
+                     color=self.player_colors.get(player1, 'blue'))
+        axes[0, 1].bar(x + width/2, player2_rates, width, label=player2, 
+                     color=self.player_colors.get(player2, 'red'))
+        
+        axes[0, 1].set_xlabel('Player Color')
+        axes[0, 1].set_ylabel('Win Rate (%)')
+        axes[0, 1].set_title('Performance by Color')
+        axes[0, 1].set_xticks(x)
+        axes[0, 1].set_xticklabels(colors)
+        axes[0, 1].legend()
+        
+        # 3. Move Type Distribution - Bottom Left
+        move_types = sorted(set(move_types_p1.keys()) | set(move_types_p2.keys()))
+        p1_values = [move_types_p1.get(mt, 0) for mt in move_types]
+        p2_values = [move_types_p2.get(mt, 0) for mt in move_types]
+        
+        # Normalize to percentages
+        p1_total = sum(p1_values)
+        p2_total = sum(p2_values)
+        p1_pct = [v/p1_total*100 if p1_total > 0 else 0 for v in p1_values]
+        p2_pct = [v/p2_total*100 if p2_total > 0 else 0 for v in p2_values]
+        
+        x = np.arange(len(move_types))
+        
+        axes[1, 0].bar(x - width/2, p1_pct, width, label=player1, 
+                     color=self.player_colors.get(player1, 'blue'))
+        axes[1, 0].bar(x + width/2, p2_pct, width, label=player2, 
+                     color=self.player_colors.get(player2, 'red'))
+        
+        axes[1, 0].set_xlabel('Move Types')
+        axes[1, 0].set_ylabel('Percentage (%)')
+        axes[1, 0].set_title('Move Type Distribution')
+        axes[1, 0].set_xticks(x)
+        # Format move type labels
+        labels = [mt.replace('MOVE_TYPES[', '').replace(']', '') if mt.startswith('MOVE_TYPES') else mt 
+                for mt in move_types]
+        axes[1, 0].set_xticklabels(labels, rotation=45, ha='right')
+        axes[1, 0].legend()
+        
+        # 4. Points Scored - Bottom Right
+        labels = ['Points Scored', 'Points Conceded', 'Point Differential']
+        p1_points = [matchup_stat['player1_points'], 
+                    matchup_stat['player2_points'], 
+                    matchup_stat['player1_points'] - matchup_stat['player2_points']]
+        p2_points = [matchup_stat['player2_points'], 
+                    matchup_stat['player1_points'], 
+                    matchup_stat['player2_points'] - matchup_stat['player1_points']]
+        
+        x = np.arange(len(labels))
+        
+        axes[1, 1].bar(x - width/2, p1_points, width, label=player1, 
+                     color=self.player_colors.get(player1, 'blue'))
+        axes[1, 1].bar(x + width/2, p2_points, width, label=player2, 
+                     color=self.player_colors.get(player2, 'red'))
+        
+        axes[1, 1].set_xlabel('Metrics')
+        axes[1, 1].set_ylabel('Points')
+        axes[1, 1].set_title('Point Distribution')
+        axes[1, 1].set_xticks(x)
+        axes[1, 1].set_xticklabels(labels, rotation=45, ha='right')
+        axes[1, 1].legend()
+        
+        plt.tight_layout()
+        fig.subplots_adjust(top=0.92)
+        
+        # Save the visualization
+        output_path = os.path.join(matchup_dir, f"{player1}_vs_{player2}.png")
+        plt.savefig(output_path, dpi=300)
+        plt.close(fig)
 
     def _generate_visualizations(self, results_dir: str):
         """
@@ -512,6 +618,10 @@ class TournamentEvaluator:
         """
         # Ensure matplotlib doesn't use GUI backend
         plt.switch_backend('Agg')
+        
+        # Create visualizations directory
+        viz_dir = os.path.join(results_dir, 'visualizations')
+        os.makedirs(viz_dir, exist_ok=True)
 
         # Load results and summary
         try:
@@ -539,10 +649,439 @@ class TournamentEvaluator:
             ])
             summary_df = self._calculate_summary_stats(results_df)
 
+        # Generate various tournament visualizations
+        try:
+            # Visualization 1: Overall Win Rate
+            self._create_win_rate_visualization(summary_df, viz_dir)
+            
+            # Visualization 2: Win Ratio Matrix
+            self._create_win_matrix_visualization(results_df, viz_dir)
+            
+            # Visualization 3: Performance by Color
+            self._create_color_performance_visualization(summary_df, viz_dir)
+            
+            # Visualization 4: Move Type Distribution
+            self._create_move_type_visualization(summary_df, viz_dir)
+            
+            # Visualization 5: Points Scored vs Conceded
+            self._create_points_visualization(summary_df, viz_dir)
+            
+            # Visualization 6: Tournament Overview Dashboard
+            self._create_tournament_dashboard(summary_df, results_df, viz_dir)
+            
+        except Exception as e:
+            self.logger.error(f"Error generating visualizations: {e}")
+            traceback.print_exc()
+
+    def _create_win_rate_visualization(self, summary_df: pd.DataFrame, viz_dir: str):
+        """
+        Create win rate visualization.
         
-
-       
-
+        Args:
+            summary_df: DataFrame with tournament summary statistics
+            viz_dir: Directory to save visualizations
+        """
+        plt.figure(figsize=(12, 8))
         
+        # Sort by win rate
+        df = summary_df.sort_values('win_rate', ascending=False)
+        
+        # Create bar plot with custom colors
+        colors = [self.player_colors.get(player, 'blue') for player in df['player']]
+        
+        # Main bars
+        ax = sns.barplot(x='player', y='win_rate', data=df, palette=colors)
+        
+        # Add value labels on top of bars
+        for i, value in enumerate(df['win_rate']):
+            ax.text(i, value + 1, f"{value:.1f}%", ha='center', va='bottom', fontweight='bold')
+        
+        # Add wins/total as text inside bars
+        for i, (wins, total) in enumerate(zip(df['wins'], df['total_matches'])):
+            ax.text(i, df['win_rate'].iloc[i]/2, f"{wins}/{total}", 
+                   ha='center', va='center', color='white', fontweight='bold')
+        
+        plt.title('Tournament Win Rates by Player', fontsize=16)
+        plt.xlabel('Player', fontsize=12)
+        plt.ylabel('Win Rate (%)', fontsize=12)
+        plt.ylim(0, max(df['win_rate']) * 1.1)  # Add some space for labels
+        plt.xticks(rotation=45, ha='right')
+        plt.tight_layout()
+        
+        plt.savefig(os.path.join(viz_dir, 'win_rates.png'), dpi=300)
+        plt.close()
 
-    
+    def _create_win_matrix_visualization(self, results_df: pd.DataFrame, viz_dir: str):
+        """
+        Create a win matrix heatmap showing head-to-head performance.
+        
+        Args:
+            results_df: DataFrame with tournament results
+            viz_dir: Directory to save visualizations
+        """
+        # Get unique players
+        all_players = sorted(list(set(results_df['player1'].unique()) | set(results_df['player2'].unique())))
+        
+        # Create empty win matrix
+        win_matrix = pd.DataFrame(
+            index=all_players,
+            columns=all_players,
+            data=np.zeros((len(all_players), len(all_players)))
+        )
+        games_matrix = pd.DataFrame(
+            index=all_players,
+            columns=all_players,
+            data=np.zeros((len(all_players), len(all_players)))
+        )
+        
+        # Fill matrices with data
+        for _, row in results_df.iterrows():
+            player1 = row['player1']
+            player2 = row['player2']
+            winner = row['winner']
+            
+            # Count games
+            games_matrix.loc[player1, player2] += 1
+            games_matrix.loc[player2, player1] += 1
+            
+            # Count wins
+            if winner == player1:
+                win_matrix.loc[player1, player2] += 1
+            elif winner == player2:
+                win_matrix.loc[player2, player1] += 1
+        
+        # Calculate win percentages
+        win_pct_matrix = win_matrix / games_matrix * 100
+        win_pct_matrix = win_pct_matrix.fillna(0)
+        
+        # Create win percentage matrix visualization
+        plt.figure(figsize=(12, 10))
+        
+        # Create heatmap
+        mask = np.eye(len(all_players), dtype=bool)  # Mask for diagonal
+        
+        # Create heatmap with rounded values
+        heatmap = sns.heatmap(
+            win_pct_matrix, 
+            annot=True, 
+            fmt='.1f', 
+            cmap='YlGnBu',
+            linewidths=1, 
+            linecolor='gray',
+            mask=mask,
+            cbar_kws={'label': 'Win Percentage (%)'}
+        )
+        
+        # Customize labels
+        plt.title('Head-to-Head Win Percentage Matrix', fontsize=16)
+        plt.xlabel('Opponent', fontsize=14)
+        plt.ylabel('Player', fontsize=14)
+        
+        # Add game counts as text annotations in each cell
+        for i, player1 in enumerate(all_players):
+            for j, player2 in enumerate(all_players):
+                if i != j:  # Skip diagonal
+                    games = int(games_matrix.loc[player1, player2])
+                    wins = int(win_matrix.loc[player1, player2])
+                    plt.text(
+                        j + 0.5, i + 0.8, 
+                        f"W:{wins}/G:{games//2}", 
+                        ha='center', va='center', 
+                        fontsize=9, 
+                        color='black' if win_pct_matrix.loc[player1, player2] < 70 else 'white',
+                        alpha=0.7
+                    )
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(viz_dir, 'win_matrix.png'), dpi=300)
+        plt.close()
+        
+        # Save win matrix as CSV
+        win_pct_matrix.to_csv(os.path.join(viz_dir, 'win_percentage_matrix.csv'))
+        games_matrix.to_csv(os.path.join(viz_dir, 'games_played_matrix.csv'))
+
+    def _create_color_performance_visualization(self, summary_df: pd.DataFrame, viz_dir: str):
+        """
+        Create visualization showing player performance by color.
+        
+        Args:
+            summary_df: DataFrame with tournament summary statistics
+            viz_dir: Directory to save visualizations
+        """
+        plt.figure(figsize=(14, 8))
+        
+        # Sort by overall win rate
+        df = summary_df.sort_values('win_rate', ascending=False)
+        
+        # Prepare data for grouped bar chart
+        x = np.arange(len(df))
+        width = 0.35
+        
+        # Create grouped bar chart
+        ax = plt.subplot(111)
+        black_bars = ax.bar(x - width/2, df['black_win_rate'], width, label='As BLACK', color='#404040')
+        red_bars = ax.bar(x + width/2, df['red_win_rate'], width, label='As RED', color='#B03060')
+        
+        # Add value labels on top of bars
+        for i, bar in enumerate(black_bars):
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + 1,
+                   f"{height:.1f}%", ha='center', va='bottom', fontsize=9)
+            
+        for i, bar in enumerate(red_bars):
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + 1,
+                   f"{height:.1f}%", ha='center', va='bottom', fontsize=9)
+        
+        # Customize plot
+        plt.title('Win Rate by Player Color', fontsize=16)
+        plt.xlabel('Player', fontsize=12)
+        plt.ylabel('Win Rate (%)', fontsize=12)
+        plt.xticks(x, df['player'], rotation=45, ha='right')
+        plt.ylim(0, max(max(df['black_win_rate']), max(df['red_win_rate'])) * 1.1)
+        plt.grid(axis='y', linestyle='--', alpha=0.7)
+        plt.legend()
+        
+        # Add average line
+        overall_avg = df['win_rate'].mean()
+        plt.axhline(y=overall_avg, color='green', linestyle='--', alpha=0.8, 
+                   label=f'Overall Average ({overall_avg:.1f}%)')
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(viz_dir, 'color_performance.png'), dpi=300)
+        plt.close()
+
+    def _create_move_type_visualization(self, summary_df: pd.DataFrame, viz_dir: str):
+        """
+        Create visualization showing move type distribution by player.
+        
+        Args:
+            summary_df: DataFrame with tournament summary statistics
+            viz_dir: Directory to save visualizations
+        """
+        # Get move type columns
+        move_type_cols = [col for col in summary_df.columns if col.startswith('move_type_')]
+        
+        if not move_type_cols:
+            self.logger.warning("No move type data found in summary stats")
+            return
+        
+        # Prepare data for stacked bar chart
+        df = summary_df.sort_values('win_rate', ascending=False)
+        move_data = df[['player'] + move_type_cols].set_index('player')
+        
+        # Clean up column names for better display
+        move_data.columns = [col.replace('move_type_', '') for col in move_data.columns]
+        
+        # Create stacked bar chart
+        plt.figure(figsize=(14, 8))
+        
+        ax = move_data.plot(
+            kind='bar',
+            stacked=True, 
+            figsize=(14, 8),
+            colormap='tab10'
+        )
+        
+        # Customize plot
+        plt.title('Move Type Distribution by Player', fontsize=16)
+        plt.xlabel('Player', fontsize=12)
+        plt.ylabel('Percentage (%)', fontsize=12)
+        plt.xticks(rotation=45, ha='right')
+        plt.grid(axis='y', linestyle='--', alpha=0.3)
+        plt.legend(title='Move Types', bbox_to_anchor=(1.05, 1), loc='upper left')
+        
+        # Add win rate text annotation above each bar
+        for i, player in enumerate(move_data.index):
+            win_rate = df[df['player'] == player]['win_rate'].values[0]
+            ax.text(i, 101, f"Win Rate: {win_rate:.1f}%", ha='center', fontsize=9, 
+                   color='black', fontweight='bold', rotation=0)
+        
+        plt.ylim(0, 110)  # Add space for the win rate text
+        plt.tight_layout()
+        plt.savefig(os.path.join(viz_dir, 'move_type_distribution.png'), dpi=300)
+        plt.close()
+
+    def _create_points_visualization(self, summary_df: pd.DataFrame, viz_dir: str):
+        """
+        Create visualization showing points scored vs conceded by player.
+        
+        Args:
+            summary_df: DataFrame with tournament summary statistics
+            viz_dir: Directory to save visualizations
+        """
+        plt.figure(figsize=(12, 10))
+        
+        # Sort by win rate
+        df = summary_df.sort_values('win_rate', ascending=False)
+        
+        # Calculate point averages
+        matches_per_player = df['total_matches']
+        df['avg_points_scored'] = df['points_scored'] / matches_per_player
+        df['avg_points_conceded'] = df['points_conceded'] / matches_per_player
+        
+        # Create scatter plot
+        scatter = plt.scatter(
+            df['avg_points_conceded'], 
+            df['avg_points_scored'],
+            s=df['win_rate'] * 10,  # Size proportional to win rate
+            c=[self.player_colors.get(p, 'blue') for p in df['player']],
+            alpha=0.7
+        )
+        
+        # Add player labels
+        for i, player in enumerate(df['player']):
+            plt.annotate(
+                player,
+                (df['avg_points_conceded'].iloc[i], df['avg_points_scored'].iloc[i]),
+                xytext=(5, 5),
+                textcoords='offset points',
+                fontsize=10,
+                fontweight='bold'
+            )
+        
+        # Add reference line (y=x)
+        max_val = max(df['avg_points_scored'].max(), df['avg_points_conceded'].max()) * 1.1
+        plt.plot([0, max_val], [0, max_val], 'r--', alpha=0.5, label='Equal Points Line')
+        
+        # Customize plot
+        plt.title('Points Scored vs. Conceded per Match', fontsize=16)
+        plt.xlabel('Average Points Conceded per Match', fontsize=12)
+        plt.ylabel('Average Points Scored per Match', fontsize=12)
+        plt.grid(True, alpha=0.3)
+        
+        # Add win rate legend
+        win_rates = [20, 40, 60, 80]
+        legend_elements = [
+            plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='gray', 
+                      markersize=np.sqrt(wr * 10), label=f'{wr}% Win Rate')
+            for wr in win_rates
+        ]
+        plt.legend(handles=legend_elements, title="Win Rate Legend", 
+                  loc='upper left', bbox_to_anchor=(1, 1))
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(viz_dir, 'points_analysis.png'), dpi=300)
+        plt.close()
+
+    def _create_tournament_dashboard(self, summary_df: pd.DataFrame, results_df: pd.DataFrame, viz_dir: str):
+        """
+        Create comprehensive tournament dashboard with key statistics.
+        
+        Args:
+            summary_df: DataFrame with tournament summary statistics
+            results_df: DataFrame with tournament results
+            viz_dir: Directory to save visualizations
+        """
+        # Create large figure with subplots
+        fig = plt.figure(figsize=(18, 16))
+        fig.suptitle('Tournament Analysis Dashboard', fontsize=20, y=0.98)
+        
+        # Grid setup: 2 rows, 2 columns
+        grid = plt.GridSpec(2, 2, hspace=0.3, wspace=0.2)
+        
+        # 1. Win Rate Bar Chart (Top Left)
+        ax1 = fig.add_subplot(grid[0, 0])
+        df_sorted = summary_df.sort_values('win_rate', ascending=False)
+        colors = [self.player_colors.get(player, 'blue') for player in df_sorted['player']]
+        sns.barplot(x='player', y='win_rate', data=df_sorted, palette=colors, ax=ax1)
+        
+        # Add value labels
+        for i, value in enumerate(df_sorted['win_rate']):
+            ax1.text(i, value + 1, f"{value:.1f}%", ha='center', va='bottom', fontsize=9)
+        
+        ax1.set_title('Player Win Rates', fontsize=14)
+        ax1.set_xlabel('Player', fontsize=10)
+        ax1.set_ylabel('Win Rate (%)', fontsize=10)
+        ax1.set_xticklabels(ax1.get_xticklabels(), rotation=45, ha='right')
+        
+        # 2. Win Matrix Heatmap (Top Right)
+        ax2 = fig.add_subplot(grid[0, 1])
+        
+        # Create win matrix
+        all_players = sorted(list(set(results_df['player1'].unique()) | set(results_df['player2'].unique())))
+        win_matrix = pd.DataFrame(index=all_players, columns=all_players, data=np.zeros((len(all_players), len(all_players))))
+        games_matrix = pd.DataFrame(index=all_players, columns=all_players, data=np.zeros((len(all_players), len(all_players))))
+        
+        # Fill matrices
+        for _, row in results_df.iterrows():
+            p1, p2, winner = row['player1'], row['player2'], row['winner']
+            games_matrix.loc[p1, p2] += 1
+            games_matrix.loc[p2, p1] += 1
+            if winner == p1:
+                win_matrix.loc[p1, p2] += 1
+            elif winner == p2:
+                win_matrix.loc[p2, p1] += 1
+        
+        # Win percentage
+        win_pct_matrix = win_matrix / games_matrix * 100
+        win_pct_matrix = win_pct_matrix.fillna(0)
+        
+        # Create heatmap
+        mask = np.eye(len(all_players), dtype=bool)
+        sns.heatmap(
+            win_pct_matrix, 
+            annot=True, 
+            fmt='.1f', 
+            cmap='YlGnBu',
+            linewidths=0.5, 
+            mask=mask,
+            ax=ax2,
+            cbar_kws={'label': 'Win %'}
+        )
+        
+        ax2.set_title('Head-to-Head Win Percentage', fontsize=14)
+        ax2.set_xlabel('Opponent', fontsize=10)
+        ax2.set_ylabel('Player', fontsize=10)
+        
+        # 3. Performance by Color (Bottom Left)
+        ax3 = fig.add_subplot(grid[1, 0])
+        
+        # Prepare data
+        x = np.arange(len(df_sorted))
+        width = 0.35
+        
+        # Create bars
+        black_bars = ax3.bar(x - width/2, df_sorted['black_win_rate'], width, label='As BLACK', color='#404040')
+        red_bars = ax3.bar(x + width/2, df_sorted['red_win_rate'], width, label='As RED', color='#B03060')
+        
+        ax3.set_title('Win Rate by Player Color', fontsize=14)
+        ax3.set_xlabel('Player', fontsize=10)
+        ax3.set_ylabel('Win Rate (%)', fontsize=10)
+        ax3.set_xticks(x)
+        ax3.set_xticklabels(df_sorted['player'], rotation=45, ha='right')
+        ax3.legend()
+        
+        # 4. Turn Distribution Violin Plot (Bottom Right)
+        ax4 = fig.add_subplot(grid[1, 1])
+        
+        # Create violin plot
+        sns.violinplot(
+            x='winner', 
+            y='turns', 
+            data=results_df[results_df['winner'].notna()],
+            palette=[self.player_colors.get(p, 'blue') for p in sorted(results_df['winner'].unique())],
+            ax=ax4
+        )
+        
+        ax4.set_title('Turn Distribution by Winner', fontsize=14)
+        ax4.set_xlabel('Winner', fontsize=10)
+        ax4.set_ylabel('Number of Turns', fontsize=10)
+        ax4.set_xticklabels(ax4.get_xticklabels(), rotation=45, ha='right')
+        
+        # Add tournament metadata
+        metadata_text = (
+            f"Total Players: {len(summary_df)}\n"
+            f"Total Matches: {len(results_df)}\n"
+            f"Avg. Turns per Match: {results_df['turns'].mean():.1f}\n"
+            f"Draws: {len(results_df[results_df['winner'].isna()])}\n"
+            f"Tournament Date: {datetime.now().strftime('%Y-%m-%d')}"
+        )
+        
+        plt.figtext(0.5, 0.01, metadata_text, ha='center', fontsize=12, 
+                   bbox=dict(facecolor='white', alpha=0.8, boxstyle='round,pad=0.5'))
+        
+        plt.tight_layout()
+        fig.subplots_adjust(top=0.94)
+        plt.savefig(os.path.join(viz_dir, 'tournament_dashboard.png'), dpi=300)
+        plt.close()

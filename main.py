@@ -79,15 +79,19 @@ def validate_player_configuration(
 
 def main():
     """Main entry point for the game."""
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO, 
-        format='%(asctime)s - %(levelname)s - %(message)s'
-    )
-
     try:
+        # Configure logging
+        logging.basicConfig(
+            level=logging.INFO, 
+            format='%(asctime)s - %(levelname)s - %(message)s'
+        )
+        logger = logging.getLogger(__name__)
+        
         # Create configuration
         config = GameConfig()
+        
+        # Log supported player types
+        logger.info(f"Supported player types: {', '.join(PlayerFactory._PLAYER_TYPES.keys())}")
 
         # Retrieve game configuration
         interface_type = config.get('ui.interface', 'console')
@@ -103,30 +107,41 @@ def main():
         player_1_color = PlayerColor.BLACK if player_1_color_name.lower() == 'black' else PlayerColor.RED
         player_2_color = PlayerColor.RED if player_1_color == PlayerColor.BLACK else PlayerColor.BLACK
 
+        # Log player configuration
+        logger.info(f"Player 1: {player_1_type} ({player_1_color.name})")
+        logger.info(f"Player 2: {player_2_type} ({player_2_color.name})")
+
         # Create interface
         interface = create_interface(interface_type, screen_width, screen_height)
 
         # Validate and get game mode
         game_mode = validate_player_configuration(player_1_type, player_2_type)
+        logger.info(f"Game mode: {game_mode}")
 
         # Create players using PlayerFactory
         try:
+            logger.info(f"Creating player 1 ({player_1_type})")
             player_1 = PlayerFactory.create_player(
                 player_type=player_1_type,
                 color=player_1_color,
                 interface=interface
             )
 
+            logger.info(f"Creating player 2 ({player_2_type})")
             player_2 = PlayerFactory.create_player(
                 player_type=player_2_type,
                 color=player_2_color,
                 interface=interface
             )
+            
+            logger.info("Players created successfully")
         except ValueError as e:
-            logging.error(f"Error creating players: {e}")
+            logger.error(f"Error creating players: {e}")
             return 1
         except Exception as e:
-            logging.error(f"Unexpected error creating players: {e}")
+            logger.error(f"Unexpected error creating players: {e}")
+            import traceback
+            traceback.print_exc()
             return 1
 
         # Create game engine components
@@ -159,7 +174,9 @@ def main():
         play_again = True
         while play_again:
             # Start game with black and red players
+            logger.info("Starting game")
             winner = engine.start_game(black_player, red_player)
+            logger.info(f"Game ended. Winner: {winner.name if winner else 'None'}")
 
             # For console interface, ask if the player wants to play again
             if interface_type.lower() == "console":
@@ -172,6 +189,7 @@ def main():
 
             if play_again:
                 # Reset the game
+                logger.info("Resetting game for new match")
                 engine.reset_game()
                 # Reset players
                 if hasattr(black_player, 'setup'):
