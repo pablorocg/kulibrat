@@ -12,7 +12,7 @@ game:
 ui:
   interface: pygame  # Options: console, pygame
   screen_width: 1024
-  screen_height: 800
+  screen_height: 768
 
 # Player configuration
 players:
@@ -28,7 +28,7 @@ strategies:
   minimax:
     max_depth: 9
     use_alpha_beta: true
-    heuristic: advanced_minimax_optim  # Use our optimized heuristic
+    heuristic: score_diff  # Use our optimized heuristic
     tt_size: 1000000  # Transposition table size
      
   mcts:
@@ -38,3 +38,4 @@ strategies:
     num_threads: 4
   
   random: {}
+

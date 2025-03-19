@@ -1,23 +1,257 @@
+#!/usr/bin/env python3
 """
-Tournament evaluation core functionality.
+Advanced Tournament Evaluation for Kulibrat AI Players.
+
+This script runs comprehensive tournaments between different AI strategies,
+generating detailed performance metrics and visualizations.
 """
 
-from collections import defaultdict
-import logging
 import os
+import sys
+import yaml
+import argparse
+import logging
 import traceback
-from datetime import datetime
-from typing import List, Dict   
-
-import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
-import yaml
+import matplotlib.pyplot as plt
+from datetime import datetime
+from typing import Dict, List, Any, Optional
+from collections import defaultdict
+import matplotlib.gridspec as gridspec
 from tqdm import tqdm
 
-from src.tournament.factory import AIPlayerFactory
-from src.tournament.match import TournamentMatch
+# Kulibrat core imports
+from src.core.game_state import GameState
+from src.core.player_color import PlayerColor
 from src.core.move_type import MoveType
+from src.core.move import Move
+
+# Player and strategy imports
+from src.players.ai.simple_ai_player import SimpleAIPlayer
+from src.players.ai.random_strategy import RandomStrategy
+from src.players.ai.minimax_strategy import MinimaxStrategy
+from src.players.ai.mcts_strategy import MCTSStrategy
+
+
+class AIPlayerFactory:
+    """Factory for creating AI players based on configuration."""
+
+    @staticmethod
+    def create_player(player_config: Dict[str, Any]) -> Any:
+        """
+        Create an AI player based on configuration.
+
+        Args:
+            player_config: Dictionary with player configuration
+
+        Returns:
+            Configured AI player
+        """
+        player_type = player_config['type']
+        name = player_config.get('name', f'{player_type}-default')
+
+        try:
+            if player_type == 'random':
+                return SimpleAIPlayer(
+                    color=PlayerColor.BLACK,  # Will be set later
+                    strategy=RandomStrategy(),
+                    name=name
+                )
+
+            elif player_type == 'minimax':
+                return SimpleAIPlayer(
+                    color=PlayerColor.BLACK,  # Will be set later
+                    strategy=MinimaxStrategy(
+                        max_depth=player_config.get('depth', 4),
+                        use_alpha_beta=player_config.get('use_alpha_beta', True),
+                        heuristic=player_config.get('heuristic', 'strategic'),
+                        tt_size=player_config.get('tt_size', 1000000)
+                    ),
+                    name=name
+                )
+
+            elif player_type == 'mcts':
+                return SimpleAIPlayer(
+                    color=PlayerColor.BLACK,  # Will be set later
+                    strategy=MCTSStrategy(
+                        simulation_time=player_config.get('simulation_time', 1.0),
+                        max_iterations=player_config.get('max_iterations', 15000)
+                    ),
+                    name=name
+                )
+
+            else:
+                raise ValueError(f"Unknown player type: {player_type}")
+
+        except Exception as e:
+            logging.error(f"Error creating player {name}: {e}")
+            return None
+
+
+class TournamentMatch:
+    """Manages a single match between two players."""
+
+    def __init__(
+        self, 
+        player1_name: str, 
+        player1, 
+        player2_name: str, 
+        player2, 
+        target_score: int = 5,
+        max_turns: int = 300
+    ):
+        """
+        Initialize tournament match configuration.
+
+        Args:
+            player1_name: Name of first player
+            player1: First player object
+            player2_name: Name of second player
+            player2: Second player object
+            target_score: Score needed to win
+            max_turns: Maximum turns before draw
+        """
+        self.player1_name = player1_name
+        self.player1 = player1
+        self.player2_name = player2_name
+        self.player2 = player2
+        self.target_score = target_score
+        self.max_turns = max_turns
+
+        # Match result tracking - initialize move_types as dictionaries
+        self.match_results = {
+            'player1': player1_name,
+            'player2': player2_name,
+            'winner': None,
+            'score_p1': 0,
+            'score_p2': 0,
+            'turns': 0,
+            'total_time': 0,
+            'player1_move_types': {m.name: 0 for m in MoveType},
+            'player2_move_types': {m.name: 0 for m in MoveType},
+            'player1_color': None,
+            'player2_color': None
+        }
+
+    def run_match(self, swap_colors: bool = False) -> Dict[str, Any]:
+        """
+        Execute a match between two players.
+
+        Args:
+            swap_colors: Whether to swap default colors
+
+        Returns:
+            Detailed match results
+        """
+        # Determine player colors
+        if not swap_colors:
+            black_player = self.player1
+            red_player = self.player2
+            black_player_name = self.player1_name
+            red_player_name = self.player2_name
+            self.match_results['player1_color'] = PlayerColor.BLACK.name
+            self.match_results['player2_color'] = PlayerColor.RED.name
+        else:
+            black_player = self.player2
+            red_player = self.player1
+            black_player_name = self.player2_name
+            red_player_name = self.player1_name
+            self.match_results['player1_color'] = PlayerColor.RED.name
+            self.match_results['player2_color'] = PlayerColor.BLACK.name
+
+        # Set player colors
+        black_player.color = PlayerColor.BLACK
+        red_player.color = PlayerColor.RED
+
+        # Initialize game state
+        game_state = GameState(target_score=self.target_score)
+
+        # Track match progress
+        turns = 0
+        start_time = datetime.now()
+        
+        # Record all moves for detailed analysis
+        all_moves = []
+
+        while not game_state.is_game_over():# and turns < self.max_turns
+            # Determine current player
+            current_color = game_state.current_player
+            current_player = black_player if current_color == PlayerColor.BLACK else red_player
+            current_player_name = black_player_name if current_color == PlayerColor.BLACK else red_player_name
+
+            # Get player move
+            move = current_player.get_move(game_state)
+
+            if not move:
+                # Skip turn if no move possible
+                game_state.current_player = game_state.current_player.opposite()
+                continue
+
+            # Apply move and track statistics
+            if game_state.apply_move(move):
+                # Track move types - ensure we're working with a dictionary
+                move_types_key = 'player1_move_types' if current_player_name == self.player1_name else 'player2_move_types'
+                move_types_dict = self.match_results[move_types_key]
+                
+                # Explicitly check that we have a dictionary
+                if not isinstance(move_types_dict, dict):
+                    logging.warning(f"Expected dictionary for {move_types_key}, found {type(move_types_dict)}. Reinitializing.")
+                    move_types_dict = {m.name: 0 for m in MoveType}
+                    self.match_results[move_types_key] = move_types_dict
+                
+                # Now safely update the move type count
+                move_type_name = move.move_type.name
+                if move_type_name in move_types_dict:
+                    move_types_dict[move_type_name] += 1
+                else:
+                    move_types_dict[move_type_name] = 1
+                
+                # Record the move details
+                move_record = {
+                    'turn': turns,
+                    'player': current_player_name,
+                    'color': current_color.name,
+                    'move_type': move.move_type.name,
+                    'start_pos': move.start_pos,
+                    'end_pos': move.end_pos
+                }
+                all_moves.append(move_record)
+
+                # Switch players and increment turns
+                game_state.current_player = game_state.current_player.opposite()
+                turns += 1
+
+        # Calculate match duration
+        end_time = datetime.now()
+        match_duration = (end_time - start_time).total_seconds()
+
+        # Determine winner
+        winner = game_state.get_winner()
+        if winner == PlayerColor.BLACK:
+            winner_name = black_player_name
+        elif winner == PlayerColor.RED:
+            winner_name = red_player_name
+        else:
+            winner_name = None
+
+        # Update match results
+        self.match_results.update({
+            'winner': winner_name,
+            'score_p1': game_state.scores[PlayerColor.BLACK] if not swap_colors else game_state.scores[PlayerColor.RED],
+            'score_p2': game_state.scores[PlayerColor.RED] if not swap_colors else game_state.scores[PlayerColor.BLACK],
+            'turns': turns,
+            'total_time': match_duration,
+            'all_moves': all_moves,
+            'final_state': {
+                'board': game_state.board.copy(),
+                'scores': game_state.scores.copy()
+            }
+        })
+
+        return self.match_results
+
 
 class TournamentEvaluator:
     """Manages tournament execution and result analysis."""
@@ -152,7 +386,7 @@ class TournamentEvaluator:
                             progress_percent = (current_match / total_matches) * 100
                             print(f"Progress: {current_match}/{total_matches} matches completed ({progress_percent:.1f}%)")
                             
-                            progress.update(1)  
+                            progress.update(1)
 
             # Save and analyze results
             self._save_interim_results(results_dir, current_match)
@@ -501,7 +735,95 @@ class TournamentEvaluator:
         except Exception as e:
             self.logger.error(f"Error saving matchup statistics: {e}")
     
-    
+    def _create_matchup_visualization(self, player1, player2, matchup_stat, move_types_p1, move_types_p2, matchup_dir):
+        """
+        Create visualization for a specific matchup.
+        
+        Args:
+            player1: First player name
+            player2: Second player name
+            matchup_stat: Matchup statistics
+            move_types_p1: Move types for player1
+            move_types_p2: Move types for player2
+            matchup_dir: Directory to save visualization
+        """
+        plt.figure(figsize=(15, 10))
+        gs = gridspec.GridSpec(2, 2, width_ratios=[1, 1], height_ratios=[1, 1])
+        
+        # 1. Win distribution
+        ax1 = plt.subplot(gs[0, 0])
+        win_data = [matchup_stat['player1_wins'], matchup_stat['player2_wins'], matchup_stat['draws']]
+        labels = [f'{player1} wins', f'{player2} wins', 'Draws']
+        colors = [self.player_colors.get(player1, 'blue'), 
+                  self.player_colors.get(player2, 'orange'), 
+                  'gray']
+        ax1.pie(win_data, labels=labels, autopct='%1.1f%%', colors=colors)
+        ax1.set_title(f'Match Outcomes: {player1} vs {player2}')
+        
+        # 2. Performance by color
+        ax2 = plt.subplot(gs[0, 1])
+        color_data = {
+            f'{player1} as BLACK': matchup_stat['player1_black_win_rate'],
+            f'{player1} as RED': matchup_stat['player1_red_win_rate'],
+            f'{player2} as BLACK': 100 - matchup_stat['player1_red_win_rate'],
+            f'{player2} as RED': 100 - matchup_stat['player1_black_win_rate']
+        }
+        bars = ax2.bar(color_data.keys(), color_data.values())
+        for i, bar in enumerate(bars):
+            if i < 2:  # First player
+                bar.set_color(self.player_colors.get(player1, 'blue'))
+            else:  # Second player
+                bar.set_color(self.player_colors.get(player2, 'orange'))
+        ax2.set_title('Win Rate by Color')
+        ax2.set_ylabel('Win Rate (%)')
+        ax2.set_ylim(0, 100)
+        plt.setp(ax2.get_xticklabels(), rotation=45, ha='right')
+        
+        # 3. Points scored
+        ax3 = plt.subplot(gs[1, 0])
+        points_data = {
+            player1: matchup_stat['player1_points'] / matchup_stat['total_matches'],
+            player2: matchup_stat['player2_points'] / matchup_stat['total_matches']
+        }
+        bars = ax3.bar(points_data.keys(), points_data.values())
+        bars[0].set_color(self.player_colors.get(player1, 'blue'))
+        bars[1].set_color(self.player_colors.get(player2, 'orange'))
+        ax3.set_title('Average Points Scored per Match')
+        ax3.set_ylabel('Points')
+        
+        # 4. Move types distribution
+        ax4 = plt.subplot(gs[1, 1])
+        
+        # Calculate percentages
+        total_moves_p1 = sum(move_types_p1.values()) or 1  # Avoid division by zero
+        total_moves_p2 = sum(move_types_p2.values()) or 1
+        
+        move_types_p1_pct = {k: v / total_moves_p1 * 100 for k, v in move_types_p1.items()}
+        move_types_p2_pct = {k: v / total_moves_p2 * 100 for k, v in move_types_p2.items()}
+        
+        # Filter move types that exist in either player's moves
+        all_move_types = set(move_types_p1.keys()) | set(move_types_p2.keys())
+        move_types = sorted(all_move_types)
+        
+        # Prepare data
+        p1_values = [move_types_p1_pct.get(move, 0) for move in move_types]
+        p2_values = [move_types_p2_pct.get(move, 0) for move in move_types]
+        
+        x = np.arange(len(move_types))
+        width = 0.35
+        
+        ax4.bar(x - width/2, p1_values, width, label=player1, color=self.player_colors.get(player1, 'blue'))
+        ax4.bar(x + width/2, p2_values, width, label=player2, color=self.player_colors.get(player2, 'orange'))
+        
+        ax4.set_title('Move Type Distribution')
+        ax4.set_ylabel('Percentage (%)')
+        ax4.set_xticks(x)
+        ax4.set_xticklabels(move_types, rotation=45, ha='right')
+        ax4.legend()
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(matchup_dir, f'{player1}_vs_{player2}.png'))
+        plt.close()
 
     def _generate_visualizations(self, results_dir: str):
         """
@@ -539,10 +861,182 @@ class TournamentEvaluator:
             ])
             summary_df = self._calculate_summary_stats(results_df)
 
-        
+        # Create a directory for visualizations
+        viz_dir = os.path.join(results_dir, 'visualizations')
+        os.makedirs(viz_dir, exist_ok=True)
 
-       
+        # Generate individual visualizations with error handling
+        try:
+            # 1. Enhanced Win Rate Chart with Wins/Losses/Draws
+            self._generate_win_rate_chart(summary_df, viz_dir)
+        except Exception as e:
+            self.logger.error(f"Error generating win rate chart: {e}")
+            
+        try:
+            # 2. Performance by Color (BLACK vs RED)
+            self._generate_color_performance_chart(summary_df, viz_dir)
+        except Exception as e:
+            self.logger.error(f"Error generating color performance chart: {e}")
+            
+        try:
+            # 3. Enhanced Move Type Distribution Heatmap
+            self._generate_move_type_heatmap(summary_df, viz_dir)
+        except Exception as e:
+            self.logger.error(f"Error generating move type heatmap: {e}")
+            
+        try:
+            # 4. Enhanced Pairwise Performance Heatmap
+            self._generate_pairwise_heatmap(results_df, viz_dir)
+        except Exception as e:
+            self.logger.error(f"Error generating pairwise heatmap: {e}")
+            
+        try:
+            # 5. Points Scored vs Conceded Scatter Plot
+            self._generate_points_scatter(summary_df, viz_dir)
+        except Exception as e:
+            self.logger.error(f"Error generating points scatter: {e}")
+            
+        try:
+            # 6. Game Length Distribution
+            self._generate_game_length_distribution(results_df, viz_dir)
+        except Exception as e:
+            self.logger.error(f"Error generating game length distribution: {e}")
+            
+        try:
+            # 7. Tournament Overview Dashboard
+            self._generate_tournament_dashboard(summary_df, results_df, viz_dir)
+        except Exception as e:
+            self.logger.error(f"Error generating tournament dashboard: {e}")
 
-        
+        self.logger.info(f"Visualizations saved in {viz_dir}")
 
+    # [Remaining visualization methods unchanged]
+    # Let's include just a sample visualization method to validate the changes:
     
+    def _generate_win_rate_chart(self, summary_df: pd.DataFrame, viz_dir: str):
+        """
+        Generate enhanced win rate chart with wins/losses/draws breakdown.
+        
+        Args:
+            summary_df: Summary statistics DataFrame
+            viz_dir: Directory to save visualizations
+        """
+        # Skip if empty or missing data
+        if summary_df.empty or 'win_rate' not in summary_df.columns:
+            self.logger.warning("Missing data for win rate chart")
+            return
+            
+        plt.figure(figsize=(14, 8))
+        
+        # Sort players by win rate
+        sorted_df = summary_df.sort_values('win_rate', ascending=False)
+        players = sorted_df['player'].tolist()
+        
+        # Set up positions for the bars
+        x = np.arange(len(players))
+        width = 0.25
+        
+        # Create stacked bar chart for match outcomes
+        ax1 = plt.subplot(111)
+        
+        # Plot wins, losses, and draws as stacked bars
+        wins = sorted_df['wins'].fillna(0).astype(int)
+        losses = sorted_df['losses'].fillna(0).astype(int)
+        draws = sorted_df['draws'].fillna(0).astype(int)
+        
+        ax1.bar(x, wins, width, label='Wins', color='forestgreen')
+        ax1.bar(x, losses, width, bottom=wins, label='Losses', color='firebrick')
+        ax1.bar(x, draws, width, bottom=wins + losses, label='Draws', color='goldenrod')
+        
+        # Add total matches as a line
+        ax2 = ax1.twinx()
+        ax2.plot(x, sorted_df['win_rate'], 'o-', color='blue', linewidth=2, markersize=8, label='Win Rate (%)')
+        
+        # Enhance appearance
+        ax1.set_xlabel('Player', fontsize=12)
+        ax1.set_ylabel('Number of Matches', fontsize=12)
+        ax2.set_ylabel('Win Rate (%)', fontsize=12)
+        
+        ax1.set_title('Player Performance Overview', fontsize=14, fontweight='bold')
+        ax1.set_xticks(x)
+        ax1.set_xticklabels(players, rotation=45, ha='right')
+        
+        # Set up grid
+        ax1.grid(axis='y', linestyle='--', alpha=0.5)
+        
+        # Display both legends
+        ax1.legend(loc='upper left')
+        ax2.legend(loc='upper right')
+        
+        # Add value labels on the bars
+        for i, (w, l, d) in enumerate(zip(wins, losses, draws)):
+            win_rate = sorted_df['win_rate'].iloc[i]
+            # Win rate label
+            ax2.annotate(f'{win_rate:.1f}%', 
+                        xy=(i, win_rate),
+                        xytext=(0, 5),
+                        textcoords='offset points',
+                        ha='center',
+                        va='bottom',
+                        fontweight='bold')
+            
+            # Stack counts
+            total = w + l + d
+            ax1.annotate(f'{w}', 
+                        xy=(i, w/2),
+                        ha='center',
+                        va='center',
+                        color='white',
+                        fontweight='bold')
+                        
+            ax1.annotate(f'{l}', 
+                        xy=(i, w + l/2),
+                        ha='center',
+                        va='center',
+                        color='white',
+                        fontweight='bold')
+                        
+            ax1.annotate(f'{d}', 
+                        xy=(i, w + l + d/2),
+                        ha='center',
+                        va='center',
+                        color='black',
+                        fontweight='bold')
+                        
+            # Total matches at the top
+            ax1.annotate(f'Total: {total}', 
+                        xy=(i, total),
+                        xytext=(0, 5),
+                        textcoords='offset points',
+                        ha='center',
+                        va='bottom')
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(viz_dir, 'player_performance.png'), dpi=300)
+        plt.close()
+
+def main():
+    """Main function to run the tournament."""
+    # Setup argument parser
+    parser = argparse.ArgumentParser(description="Run Kulibrat AI Tournament")
+    parser.add_argument(
+        '--config', 
+        type=str, 
+        default='tournament_config.yaml',
+        help='Path to tournament configuration YAML file'
+    )
+    
+    # Parse arguments
+    args = parser.parse_args()
+
+    # Run tournament
+    try:
+        tournament = TournamentEvaluator(args.config)
+        tournament.run_tournament()
+    except Exception as e:
+        logging.error(f"Tournament failed: {e}")
+        traceback.print_exc()
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

@@ -48,6 +48,12 @@ class GameConfig:
             # System-wide config
             '/etc/kulibrat/config.yaml'
         ]
+
+        # Get screen width and height from environment variables
+        env_screen_width = os.getenv('KULIBRAT_SCREEN_WIDTH')
+        env_screen_height = os.getenv('KULIBRAT_SCREEN_HEIGHT')
+        screen_width = (int(env_screen_width) * 3)//4 if env_screen_width else 1024
+        screen_height = (int(env_screen_height)*3)//4 if env_screen_height else 768
         
         # Default configuration
         config = {
@@ -74,8 +80,8 @@ class GameConfig:
             },
             'ui': {
                 'interface': 'console',
-                'screen_width': 1024,
-                'screen_height': 800
+                'screen_width': screen_width,
+                'screen_height': screen_height
             }
         }
         
