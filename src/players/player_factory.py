@@ -6,7 +6,6 @@ from src.config.game_config import GameConfig
 from src.core.player_color import PlayerColor
 from src.players.human_player.human_player import HumanPlayer
 from src.players.mcts_player.mcts_player import MCTSPlayer
-from src.players.mcts_player.optimized_mcts_player import OptimizedMCTSPlayer
 from src.players.minimax_player.minimax_player import MinimaxPlayer
 from src.players.player import Player
 from src.players.random_player.random_player import RandomPlayer
@@ -26,8 +25,7 @@ class PlayerFactory:
         "minimax": MinimaxPlayer,
         "mcts": MCTSPlayer,
         "random": RandomPlayer,
-        "human": HumanPlayer,
-        "optimized_mcts": OptimizedMCTSPlayer
+        "human": HumanPlayer
     }
 
     @classmethod

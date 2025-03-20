@@ -9,6 +9,7 @@ models/*
 # Documentation
 rules/rules.md
 *E.md
+report.md
 
 # Log files
 *.log

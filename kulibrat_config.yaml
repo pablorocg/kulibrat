@@ -26,14 +26,15 @@ players:
 # AI Strategies Configuration
 strategies:
   minimax:
-    time_limit: 5.0  # Time limit in seconds for move calculation
+    time_limit: 2.5  # Time limit in seconds for move calculation
     max_depth: 20     # Maximum depth (safety limit)
     use_alpha_beta: true
     heuristic: score_diff
     tt_size: 1000000  # Transposition table size
+  
   mcts:
-    simulation_time: 5.0
-    max_iterations: 20000
-    exploration_weight: 1.41
-    num_threads: 6
+    simulation_time: 2.5
+    max_iterations: 200000
+    exploration_weight: 2.5 # The bigger the value, the more exploration
+    
   random: {}

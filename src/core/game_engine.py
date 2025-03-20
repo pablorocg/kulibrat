@@ -105,7 +105,7 @@ class GameEngine:
                 if self.current_player_color != self.state.current_player:
                     self.current_player_color = self.state.current_player
 
-            except Exception as e:
+            except Exception:
                 import traceback
 
                 traceback.print_exc()
@@ -122,7 +122,6 @@ class GameEngine:
         if self.interface:
             self.interface.show_winner(winner, self.state)
 
-        self.logger.info(f"Game over. Winner: {winner}")
         return winner
 
     def reset_game(self, target_score: Optional[int] = None):

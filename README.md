@@ -1,114 +1,158 @@
 # Kulibrat
 
-A minimalist board game with simple rules yet non-trivial strategy. Kulibrat ("marble on a board") features a 3x4 board where two players move pieces diagonally, attempting to cross the board while blocking opponents through strategic placement, attacks, and jumps.
+A minimalist board game with simple rules and non-trivial strategy, implemented in Python.
 
-## Game Overview
+## About the Game
 
-Kulibrat was invented by Thomas Bolander with the aim of creating a game with the smallest possible board and simplest possible rules that would still be non-trivial in terms of strategy.
+Kulibrat is a strategic board game invented by Thomas Bolander, designed to create a complex gameplay experience on a small 3x4 board. The name is an abbreviation of "kugle i bræt" (Danish for "marble on a board").
 
-- **Players**: 2 players (Red and Black)
-- **Board**: 3x4 grid
-- **Pieces**: 4 pieces per player
-- **Goal**: Be the first to score 5 points by moving pieces across the board
-
-## Rules
-
-Each player has a starting row on their side of the board. On each turn, a player can:
-
-1. **Insert** a piece on an empty square in their starting row
-2. **Move diagonally** forward to an empty square
-3. **Attack** an opponent's piece directly in front, taking its place
-4. **Jump** over a line of opponent pieces (1-3 pieces) to an empty square or off the board
-
-Points are scored when a piece moves off the opponent's edge of the board, either through a diagonal move or jump.
-
-## Installation
-
-### Requirements
-
-- Python 3.6+
-- Pygame (for the graphical interface)
-
-### Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/username/kulibrat.git
-cd kulibrat
-
-# Install dependencies
-pip install pygame
-```
-
-## Usage
-
-### Graphical Interface
-
-```bash
-# Run with default settings
-python main.py
-
-# Run with custom win score
-python main.py --win-score 10
-```
-
-### Command Line Interface
-
-```bash
-# Play in command line mode (human vs. human)
-python main.py --cli
-
-# Play against AI (human as Black, AI as Red)
-python main.py --cli --red-ai
-
-# AI vs. AI game
-python main.py --cli --black-ai --red-ai
-```
-
-## Controls
-
-- **GUI Mode**:
-  - Click on a piece to select it
-  - Click on a highlighted square to move the selected piece
-  - Click on a highlighted square in your start row to insert a new piece
-  - After game over, press 'R' to restart or 'Q' to quit
-
-- **CLI Mode**:
-  - Follow the on-screen prompts to select your move
+### Game Characteristics
+- Board: 3x4 grid
+- Players: 2 (Black and Red)
+- Pieces: 4 per player
+- Objective: Be the first to score 5 points by moving pieces across the board
 
 ## Project Structure
 
 ```
 kulibrat/
-├── __init__.py
 ├── src/
-│   ├── __init__.py
-│   ├── board.py       # Board representation and game state
-│   ├── moves.py       # Move validation and execution
-│   ├── player.py      # Player logic
-│   └── game.py        # Main game loop and scoring
-├── gui/
-│   ├── __init__.py
-│   ├── assets/
-│   │   ├── red_piece.png
-│   │   └── black_piece.png
-│   └── ui.py          # GUI implementation
-└── main.py            # Entry point
+│   ├── core/           # Game core logic
+│   │   ├── game_engine.py
+│   │   ├── game_rules.py
+│   │   ├── game_state.py
+│   │   └── ...
+│   ├── players/        # AI and player strategies
+│   │   ├── human_player/
+│   │   ├── mcts_player/
+│   │   ├── minimax_player/
+│   │   └── random_player/
+│   ├── tournament/     # Tournament management
+│   │   ├── runner.py
+│   │   ├── evaluator.py
+│   │   └── ...
+│   └── ui/             # User interfaces
+│       ├── console_interface.py
+│       ├── pygame_interface.py
+│       └── ...
+├── main.py             # Game entry point
+├── run_tournament.py   # Tournament runner
+└── requirements.txt    # Project dependencies
 ```
 
-## Creating Assets
+## Key Features
 
-The game looks for piece images in the `gui/assets/` directory:
+### Gameplay Mechanics
+- Multiple move types:
+  1. Insert: Place a piece on the start row
+  2. Diagonal move: Move diagonally forward
+  3. Attack: Capture opponent's piece
+  4. Jump: Leap over opponent's pieces
 
-- `red_piece.png` - Image for red player pieces
-- `black_piece.png` - Image for black player pieces
+### AI Strategies
+- Random Player: Moves randomly
+- Minimax Player: Uses minimax algorithm with configurable depth
+- Monte Carlo Tree Search (MCTS): Probabilistic search strategy
 
-If these files are not found, the game will fallback to using colored circles.
+### User Interfaces
+- Console Interface: Text-based gameplay
+- Pygame GUI: Graphical interface with interactive board
+
+## Installation
+
+### Prerequisites
+- Python 3.8+
+- Dependencies listed in `requirements.txt`
+
+### Setup
+```bash
+# Clone the repository
+git clone https://github.com/pablorocg/kulibrat.git
+cd kulibrat
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+## Running the Game
+
+### Graphical Interface
+```bash
+# Default game
+python main.py
+
+# Customize win score
+python main.py --win-score 10
+```
+
+### Command Line Interface
+```bash
+# Human vs Human
+python main.py --cli
+
+# Human vs AI
+python main.py --cli --red-ai
+
+# AI vs AI
+python main.py --cli --black-ai --red-ai
+```
+
+## Tournament Mode
+
+Run AI strategy tournaments:
+
+```bash
+python run_tournament.py --config tournament_config.yaml
+```
+
+### Tournament Features
+- Configurable match parameters
+- Multiple AI strategy comparisons
+- Detailed performance reporting
+
+## Advanced Features
+
+- Genetic algorithm for AI heuristic optimization
+- Comprehensive game statistics tracking
+- Flexible configuration via YAML
+- Extensible player and strategy design
+
+## Configuration
+
+Key configuration files:
+- `kulibrat_config.yaml`: Game settings
+- `tournament_config.yaml`: Tournament parameters
+
+## Development
+
+### Running Tests
+```bash
+pytest
+```
+
+### Code Quality
+- Black for formatting
+- Mypy for type checking
+- Pylint for linting
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit changes
+4. Push to the branch
+5. Create a Pull Request
 
 ## License
 
-This project is released under the MIT License.
+Distributed under the MIT License.
 
 ## Acknowledgements
 
-- Thomas Bolander for inventing the Kulibrat game and documenting its rules
+- Thomas Bolander: Game Inventor
+- Contributors and open-source community
+
+## Contact
+
+Project Link: [GitHub Repository URL]
+Maintainer: Pablo Rocamora-García, 

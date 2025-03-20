@@ -96,7 +96,7 @@ def main():
         # Retrieve game configuration
         interface_type = config.get('ui.interface', 'console')
         screen_width = config.get('ui.screen_width', 1024)
-        screen_height = config.get('ui.screen_height', 800)
+        screen_height = config.get('ui.screen_height', 768)
         player_1_type = config.get('players.player_1.type', 'human')
         player_2_type = config.get('players.player_2.type', 'minimax')
         player_1_color_name = config.get('players.player_1.color', 'black')
