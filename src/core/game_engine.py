@@ -1,6 +1,5 @@
 """ """
 
-import logging
 from typing import Dict, List, Optional
 
 from src.core.game_rules import GameRules
@@ -33,9 +32,6 @@ class GameEngine:
             interface: Optional game interface for display and interaction
             target_score: Score needed to win the game
         """
-        # Configure logging
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.INFO)
 
         # Game components
         self.rules_engine = rules_engine
@@ -68,7 +64,6 @@ class GameEngine:
 
         # Validate players
         if not self._validate_players():
-            self.logger.error("Invalid player configuration")
             return None
 
         # Initialize players
@@ -76,7 +71,6 @@ class GameEngine:
             player.setup(self.state)
 
         # Main game loop
-        self.logger.info("Starting game")
         self._display_state()
 
         # Reset current player to BLACK
@@ -87,9 +81,6 @@ class GameEngine:
             try:
                 # Get current player
                 current_player = self.players[self.current_player_color]
-
-                # Display whose turn it is
-                self.logger.info(f"{self.current_player_color.name}'s turn")
 
                 # Get player's move
                 move = current_player.get_move(self.state)
@@ -105,7 +96,6 @@ class GameEngine:
                 # Record move history if a move was made
                 if move:
                     self.moves_history.append((self.current_player_color, move))
-                    self.logger.info(f"Move: {move}")
 
                 # Display updated state
                 self._display_state()
@@ -116,7 +106,6 @@ class GameEngine:
                     self.current_player_color = self.state.current_player
 
             except Exception as e:
-                self.logger.error(f"Error during game play: {e}")
                 import traceback
 
                 traceback.print_exc()
@@ -163,13 +152,11 @@ class GameEngine:
         """
         # Check if both players are present
         if len(self.players) != 2:
-            self.logger.error("Two players are required")
             return False
 
         # Check if players have different colors
         player_colors = list(self.players.keys())
         if player_colors[0] == player_colors[1]:
-            self.logger.error("Players must have different colors")
             return False
 
         return True

@@ -95,7 +95,7 @@ class TournamentEvaluator:
             # Run matches between all player pairs, ensuring each player plays both colors
             for i, player1_name in enumerate(player_names):
                 for j, player2_name in enumerate(player_names):
-                    if i == j:  # Skip matches with same player
+                    if i >= j:  # Skip matches with same player
                         continue
 
                     player1 = players[player1_name]

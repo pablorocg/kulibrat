@@ -2,8 +2,6 @@
 Game rules for Kulibrat.
 """
 
-import logging
-
 from src.core.game_state import GameState
 from src.core.move import Move
 from src.core.move_type import MoveType
@@ -18,8 +16,7 @@ class GameRules:
         """
         Initialize game rules with logging.
         """
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.INFO)
+        
 
     def validate_move(self, game_state: GameState, move: Move) -> bool:
         """
@@ -38,9 +35,7 @@ class GameRules:
             and game_state.board[move.start_pos[0], move.start_pos[1]]
             != game_state.current_player.value
         ):
-            self.logger.warning(
-                "Move validation failed: Piece at start position does not belong to current player"
-            )
+            
             return False
 
         # Move type specific validation
@@ -58,7 +53,7 @@ class GameRules:
             return False
 
         except Exception as e:
-            self.logger.error(f"Error validating move {move}: {e}")
+            
             return False
 
     def _validate_insert_move(self, game_state: GameState, move: Move) -> bool:
@@ -76,18 +71,15 @@ class GameRules:
 
         # Check if player has pieces available to insert
         if game_state.pieces_off_board[player] <= 0:
-            self.logger.warning(f"{player} has no pieces left to insert")
             return False
 
         # Verify insert is on the player's start row
         row, col = move.end_pos
         if row != player.start_row:
-            self.logger.warning(f"Insert move must be on {player}'s start row")
             return False
 
         # Check if the target square is empty
         if game_state.board[row, col] != 0:
-            self.logger.warning("Target square is not empty")
             return False
 
         return True
@@ -110,12 +102,10 @@ class GameRules:
         # Check diagonal move direction
         direction = player.direction
         if end_row != start_row + direction:
-            self.logger.warning("Invalid diagonal move direction")
             return False
 
         # Check column movement (must be one column left or right)
         if abs(end_col - start_col) != 1:
-            self.logger.warning("Diagonal move must be to an adjacent column")
             return False
 
         # Check destination is empty or off the board
@@ -124,7 +114,6 @@ class GameRules:
             and 0 <= end_col < game_state.BOARD_COLS
         ):
             if game_state.board[end_row, end_col] != 0:
-                self.logger.warning("Destination square is not empty")
                 return False
 
         return True
@@ -148,17 +137,14 @@ class GameRules:
         # Check move direction
         direction = player.direction
         if end_row != start_row + direction:
-            self.logger.warning("Invalid attack move direction")
             return False
 
         # Check column remains the same
         if start_col != end_col:
-            self.logger.warning("Attack move must be in the same column")
             return False
 
         # Check destination has an opponent's piece
         if game_state.board[end_row, end_col] != opponent.value:
-            self.logger.warning("Attack move must target an opponent's piece")
             return False
 
         return True
@@ -181,7 +167,6 @@ class GameRules:
 
         # Check column remains the same
         if start_col != end_col:
-            self.logger.warning("Jump move must be in the same column")
             return False
 
         # Calculate jump direction and line of pieces
@@ -199,7 +184,6 @@ class GameRules:
 
         # Check jump conditions
         if line_length == 0 or line_length > 3:
-            self.logger.warning(f"Invalid jump line length: {line_length}")
             return False
 
         # Calculate landing position
@@ -209,7 +193,6 @@ class GameRules:
         if 0 <= landing_row < game_state.BOARD_ROWS:
             # On-board landing must be to an empty square
             if game_state.board[landing_row, start_col] != 0:
-                self.logger.warning("Jump landing square is not empty")
                 return False
 
         return True

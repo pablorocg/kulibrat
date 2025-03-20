@@ -150,7 +150,7 @@ class MCTSPlayer(Player):
     def _simulate(self, state: GameState, player_color: PlayerColor) -> float:
         """Run a completely random simulation (classic MCTS)."""
         simulation_state = state
-        max_moves = 80  # Prevent infinite loops
+        max_moves = 40  # Prevent infinite loops
         move_count = 0
         
         while not simulation_state.is_game_over() and move_count < max_moves:
@@ -190,6 +190,8 @@ class MCTSPlayer(Player):
             return 0.0
         else:
             return 0.5  # Draw
+
+    
     
     def _backpropagate(self, node: MCTSNode, result: float):
         """Update statistics for all nodes in the path from leaf to root."""

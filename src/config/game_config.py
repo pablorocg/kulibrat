@@ -4,7 +4,6 @@ Supports multiple configuration sources with priority.
 """
 
 
-import logging
 import os
 from typing import Any, Dict, Optional
 
@@ -20,8 +19,6 @@ class GameConfig:
     # Singleton instance
     _instance = None
 
-    # Logging
-    _logger = logging.getLogger(__name__)
 
     def __new__(cls):
         """
@@ -97,7 +94,6 @@ class GameConfig:
                     # Deep merge configurations
                     cls._deep_merge(config, file_config)
 
-                    cls._logger.info(f"Loaded configuration from {path}")
                     break
             except FileNotFoundError:
                 continue

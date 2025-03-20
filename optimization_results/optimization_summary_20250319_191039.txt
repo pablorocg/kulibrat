@@ -1,0 +1,25 @@
+===== OPTIMIZATION PARAMETERS =====
+Start time: 2025-03-19 18:52:25.818914
+End time: 2025-03-19 19:10:39.344193
+Population size: 200
+Generations: 10
+Crossover probability: 0.7
+Mutation probability: 0.2
+Number of opponents: 2
+Matches per pairing: 2
+
+===== OPTIMIZATION RESULTS =====
+Best weights: [1.2378, 0.9124, 1.8151, 1.1919, -0.1175]
+Best fitness (win rate): 1.0000
+
+===== EVOLUTION PROGRESS =====
+Gen 0: Evals=200, Avg=0.3919, Max=0.8750
+Gen 1: Evals=163, Avg=0.4394, Max=0.8750
+Gen 2: Evals=162, Avg=0.4506, Max=0.8750
+Gen 3: Evals=163, Avg=0.4519, Max=0.8750
+Gen 4: Evals=141, Avg=0.4994, Max=0.8750
+Gen 5: Evals=159, Avg=0.5006, Max=1.0000
+Gen 6: Evals=144, Avg=0.5025, Max=1.0000
+Gen 7: Evals=160, Avg=0.4794, Max=1.0000
+Gen 8: Evals=144, Avg=0.5238, Max=1.0000
+Gen 9: Evals=157, Avg=0.5100, Max=1.0000

@@ -84,21 +84,31 @@ class HeuristicWeightOptimizer:
         Prepare a reduced list of opponent players to test against.
         """
         from src.players.random_player.random_player import RandomPlayer
+        from src.players.mcts_player.mcts_player import MCTSPlayer
         
-        # Define a smaller set of opponents with different strategies
+        # Define a set of opponents with different strategies
         self.opponents = [
             # Random player
             RandomPlayer(color=PlayerColor.RED, name="Random"),
             
-            # Silent Minimax player
+            # Minimax player with different heuristics
             SilentMinimaxPlayer(
                 color=PlayerColor.RED,
                 name="Minimax-Score",
                 max_depth=3,
                 use_alpha_beta=True, 
                 heuristic='score_diff'
+            ),
+            
+            # A Minimax player with advanced heuristic
+            SilentMinimaxPlayer(
+                color=PlayerColor.RED,
+                name="Minimax-Advanced",
+                max_depth=3,
+                use_alpha_beta=True, 
+                heuristic='advanced'
             )
-        ][:self.num_opponents]
+        ][:self.num_opponents]  # Limit to specified number
     
     def _setup_genetic_algorithm(self):
         """
@@ -516,12 +526,12 @@ def main():
             
         # Create and run optimizer with reduced parameters
         optimizer = HeuristicWeightOptimizer(
-            population_size=200,       # Reduced from 50
-            generations=10,           # Reduced from 20
+            population_size=20,       # Small population for testing
+            generations=10,           # Fewer generations for testing
             crossover_prob=0.7, 
             mutation_prob=0.2,
-            num_opponents=2,          # Reduced from 3
-            matches_per_pairing=2     # Reduced from 3
+            num_opponents=2,          # Reduced opponents
+            matches_per_pairing=2     # Fewer matches for faster evaluation
         )
         
         # Run optimization

@@ -2,9 +2,9 @@
 
 # Tournament-wide settings
 tournament:
-  matches_per_pairing: 5  # Number of matches between each pair of players
+  matches_per_pairing: 25  # Number of matches between each pair of players
   target_score: 5  # Score needed to win a match
-  max_turns: 100  # Maximum turns before declaring a draw
+  max_turns: 80  # Maximum turns before declaring a draw
 
 # Player configurations
 players:
@@ -13,24 +13,30 @@ players:
     type: random
 
   # Minimax players with different heuristics
-  - name: Minimax-Score
+  - name: Minimax_Score
     type: minimax
     depth: 8
     use_alpha_beta: true
     heuristic: score_diff
 
-  - name: Minimax-Advanced
+  - name: Minimax-score_mobility_special
     type: minimax
     depth: 8
     use_alpha_beta: true
-    heuristic: advanced
+    heuristic: score_mobility_special
+
+  # - name: Minimax_score_diff_with_deadlock
+  #   type: minimax
+  #   depth: 8
+  #   use_alpha_beta: true
+  #   heuristic: score_diff_with_deadlock
 
   # Enhanced Minimax strategy optimized for Kulibrat
-  - name: Minimax-Advanced-Optim
-    type: minimax
-    depth: 8  # Increased base depth
-    use_alpha_beta: true
-    heuristic: advanced_minimax_optim
+  # - name: Minimax-Advanced-Optim
+  #   type: minimax
+  #   depth: 8  # Increased base depth
+  #   use_alpha_beta: true
+  #   heuristic: advanced_minimax_optim
 
   # - name: Minimax-Aggressive
   #   type: minimax

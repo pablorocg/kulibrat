@@ -1,10 +1,8 @@
-# src/core/turn_manager.py
-import logging
 from typing import Optional
 
+from src.core.game_rules import GameRules
 from src.core.game_state import GameState
 from src.core.move import Move
-from src.core.game_rules import GameRules
 from src.players.player import Player
 
 
@@ -20,8 +18,6 @@ class TurnManager:
         Args:
             rules_engine: Optional custom rules engine
         """
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(logging.INFO)
 
         # Use provided rules engine or default
         self.rules_engine = rules_engine or GameRules()
@@ -43,41 +39,32 @@ class TurnManager:
         Raises:
             ValueError: If the move is invalid
         """
-        # Log turn start
-        self.logger.info(f"Processing turn for {player.color}")
 
         # Create a copy of the game state to modify
         new_state = game_state.copy()
 
         # Ensure the current_player is set correctly
         if new_state.current_player != player.color:
-            self.logger.warning(
-                f"Current player mismatch. Expected {player.color}, got {new_state.current_player}. Correcting."
-            )
             new_state.current_player = player.color
 
         # If no moves are available
         valid_moves = new_state.get_valid_moves()
         if not valid_moves:
-            self.logger.info(f"No valid moves for {player.color}")
             return self._handle_no_moves(new_state)
 
         # If no move provided but moves are available
         if move is None:
-            self.logger.warning(f"No move selected for {player.color}")
             return new_state
 
         # Validate the move
         if not self.rules_engine.validate_move(new_state, move):
             error_msg = f"Invalid move for {player.color}: {move}"
-            self.logger.error(error_msg)
             raise ValueError(error_msg)
 
         # Apply the move
         success = new_state.apply_move(move)
         if not success:
             error_msg = f"Failed to apply move: {move}"
-            self.logger.error(error_msg)
             raise ValueError(error_msg)
 
         # Explicitly switch to the next player after a successful move
@@ -85,9 +72,6 @@ class TurnManager:
 
         # Notify player about the move
         player.notify_move(move, new_state)
-
-        # Log move details
-        self.logger.info(f"Move applied: {move}")
 
         return new_state
 
@@ -106,9 +90,4 @@ class TurnManager:
 
         # Switch to the other player
         new_state.current_player = new_state.current_player.opposite()
-
-        self.logger.info(
-            f"No moves for {game_state.current_player}. Switching to {new_state.current_player}."
-        )
-
         return new_state
