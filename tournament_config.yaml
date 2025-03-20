@@ -2,31 +2,25 @@
 
 # Tournament-wide settings
 tournament:
-  matches_per_pairing: 4  # Number of matches between each pair of players
+  matches_per_pairing: 10  # Number of matches between each pair of players
   target_score: 5  # Score needed to win a match
   max_turns: 80  # Maximum turns before declaring a draw
 
 # Player configurations
 players:
   # Random strategy player as baseline
-  # - name: Random
-  #   type: random
+  - name: Random
+    type: random
 
   # Standard Minimax
   - name: Minimax-AB
     type: minimax
-    depth: 6
+    depth: 8
     use_alpha_beta: true
     heuristic: score_diff
 
   # NegaScout player
   - name: NegaScout-Basic
-    type: negascout
-    depth: 6
-    heuristic: score_diff
-
-  # NegaScout with deeper search
-  - name: NegaScout-Deep
     type: negascout
     depth: 8
     heuristic: score_diff
@@ -34,14 +28,14 @@ players:
   # NegaScout with different heuristic
   - name: NegaScout-Strategic
     type: negascout
-    depth: 6
+    depth: 8
     heuristic: score_mobility_special
 
   # # MCTS for comparison
-  # - name: MCTS-1.5s
-  #   type: mcts
-  #   simulation_time: .5
-  #   max_iterations: 100000
+  - name: MCTS-1.5s
+    type: mcts
+    simulation_time: .5
+    max_iterations: 100000
 
 # Output configuration
 output:

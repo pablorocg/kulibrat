@@ -8,9 +8,9 @@ import sys
 import traceback
 from typing import Optional, List, Dict, Any
 
-from src.tournament.config import TournamentConfig
+# from src.tournament.config import TournamentConfig
 from src.tournament.evaluator import TournamentEvaluator
-
+import os
 
 class TournamentRunner:
     """
@@ -71,11 +71,14 @@ class TournamentRunner:
                 traceback.print_exc()
             raise
     
+    # Enhanced logging for TournamentRunner.cli() method
     @classmethod
     def cli(cls):
         """
         Command-line interface for running tournaments.
         """
+        logger = logging.getLogger(__name__)
+        
         # Setup argument parser
         parser = argparse.ArgumentParser(description="Kulibrat AI Tournament Runner")
         parser.add_argument(
@@ -92,19 +95,27 @@ class TournamentRunner:
         
         # Parse arguments
         args = parser.parse_args()
+        logger.info(f"Tournament arguments: config={args.config}, verbose={args.verbose}")
         
         try:
+            # Check if config file exists
+            if not os.path.exists(args.config):
+                logger.error(f"Configuration file not found: {args.config}")
+                return 1
+                
             # Create and run tournament
+            logger.info(f"Creating tournament runner with config: {args.config}")
             runner = cls(args.config, args.verbose)
+            logger.info("Starting tournament execution")
             results = runner.run()
             
             # Optional: Add more CLI-specific result handling here
-            print(f"Tournament completed. Total matches: {len(results)}")
+            logger.info(f"Tournament completed. Total matches: {len(results)}")
             
             return 0
-        except Exception:
+        except Exception as e:
+            logger.exception(f"Tournament execution failed: {e}")
             return 1
-
 
 def main():
     """
