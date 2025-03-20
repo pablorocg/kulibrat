@@ -74,7 +74,7 @@ class GameConfig:
                     "simulation_time": 2.0,
                     "max_iterations": 15000,
                     "exploration_weight": 1.41,
-                    "num_threads": 4,
+                    
                 },
                 "random": {},
             },

@@ -1,0 +1,18 @@
+# Optimization Configuration for Kulibrat AI
+
+# MCTS Exploration Weight Optimization
+mcts:
+  population_size: 20
+  generations: 10
+  exploration_range: [0.5, 3.0]
+  tournament_config: 'tournament_config.yaml'
+
+# Heuristic Weights Optimization
+heuristic:
+  population_size: 30
+  generations: 15
+  weight_ranges: 
+    - [0.5, 2.0]  # Range for first weight
+    - [0.5, 2.0]  # Range for second weight
+    # Add more ranges as needed
+  tournament_config: 'tournament_config.yaml'

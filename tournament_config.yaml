@@ -25,6 +25,12 @@ players:
     use_alpha_beta: true
     heuristic: score_mobility_special
 
+  - name: MCTS-1.5s
+    type: mcts
+    simulation_time: 1.5
+    max_iterations: 100000
+
+
   # - name: Minimax_score_diff_with_deadlock
   #   type: minimax
   #   depth: 8
