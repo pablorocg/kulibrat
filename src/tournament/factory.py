@@ -9,6 +9,7 @@ from src.core.player_color import PlayerColor
 from src.players.random_player.random_player import RandomPlayer
 from src.players.minimax_player.minimax_player import MinimaxPlayer
 from src.players.mcts_player.mcts_player import MCTSPlayer
+from src.players.negascout_player.negascout_player import NegaScoutPlayer
 
 
 class AIPlayerFactory:
@@ -51,9 +52,20 @@ class AIPlayerFactory:
                     name=name,
                     simulation_time=player_config.get('simulation_time', 1.0),
                     max_iterations=player_config.get('max_iterations', 15000),
-                    exploration_weight=player_config.get('exploration_weight', 1.41),
-                    num_threads=player_config.get('num_threads', 4)
+                    exploration_weight=player_config.get('exploration_weight', 1.41),  
                 )
+            
+            elif player_type == 'negascout':
+                
+                return NegaScoutPlayer(
+                    color=color,
+                    name=name,
+                    time_limit=player_config.get('time_limit', 1.0),
+                    max_depth=player_config.get('depth', 4),
+                    heuristic=player_config.get('heuristic', 'score_diff'),
+                    tt_size=player_config.get('tt_size', 1000000)
+                )
+                
 
             else:
                 raise ValueError(f"Unknown player type: {player_type}")

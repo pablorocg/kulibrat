@@ -35,6 +35,6 @@ strategies:
   mcts:
     simulation_time: 2.5
     max_iterations: 200000
-    exploration_weight: 2.5 # The bigger the value, the more exploration
+    exploration_weight: 1 # The bigger the value, the more exploration
     
   random: {}

@@ -7,6 +7,7 @@ from src.core.player_color import PlayerColor
 from src.players.human_player.human_player import HumanPlayer
 from src.players.mcts_player.mcts_player import MCTSPlayer
 from src.players.minimax_player.minimax_player import MinimaxPlayer
+from src.players.negascout_player.negascout_player import NegaScoutPlayer
 from src.players.player import Player
 from src.players.random_player.random_player import RandomPlayer
 from src.ui.game_interface import GameInterface
@@ -25,7 +26,8 @@ class PlayerFactory:
         "minimax": MinimaxPlayer,
         "mcts": MCTSPlayer,
         "random": RandomPlayer,
-        "human": HumanPlayer
+        "human": HumanPlayer,
+        "negascout": NegaScoutPlayer
     }
 
     @classmethod

@@ -1,0 +1,1 @@
+from src.players.negascout_player.negascout_player import NegaScoutPlayer

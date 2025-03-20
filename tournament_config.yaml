@@ -1,34 +1,92 @@
-# Kulibrat Tournament Configuration
+# Kulibrat Tournament Configuration with NegaScout
 
 # Tournament-wide settings
 tournament:
-  matches_per_pairing: 25  # Number of matches between each pair of players
+  matches_per_pairing: 4  # Number of matches between each pair of players
   target_score: 5  # Score needed to win a match
   max_turns: 80  # Maximum turns before declaring a draw
 
 # Player configurations
 players:
-  # Random strategy player
-  - name: Random
-    type: random
+  # Random strategy player as baseline
+  # - name: Random
+  #   type: random
 
-  # Minimax players with different heuristics
-  - name: Minimax_Score
+  # Standard Minimax
+  - name: Minimax-AB
     type: minimax
-    depth: 8
+    depth: 6
     use_alpha_beta: true
     heuristic: score_diff
 
-  - name: Minimax-score_mobility_special
-    type: minimax
+  # NegaScout player
+  - name: NegaScout-Basic
+    type: negascout
+    depth: 6
+    heuristic: score_diff
+
+  # NegaScout with deeper search
+  - name: NegaScout-Deep
+    type: negascout
     depth: 8
-    use_alpha_beta: true
+    heuristic: score_diff
+
+  # NegaScout with different heuristic
+  - name: NegaScout-Strategic
+    type: negascout
+    depth: 6
     heuristic: score_mobility_special
 
-  - name: MCTS-1.5s
-    type: mcts
-    simulation_time: 1.5
-    max_iterations: 100000
+  # # MCTS for comparison
+  # - name: MCTS-1.5s
+  #   type: mcts
+  #   simulation_time: .5
+  #   max_iterations: 100000
+
+# Output configuration
+output:
+  results_dir: tournament_results
+  save_csv: true
+  save_plots: true
+
+# # Kulibrat Tournament Configuration
+
+# # Tournament-wide settings
+# tournament:
+#   matches_per_pairing: 10  # Number of matches between each pair of players
+#   target_score: 5  # Score needed to win a match
+#   max_turns: 80  # Maximum turns before declaring a draw
+
+# # Player configurations
+# players:
+#   # Random strategy player
+#   - name: Random
+#     type: random
+
+#   # Minimax players with different heuristics
+#   - name: Minimax_Score
+#     type: minimax
+#     depth: 8
+#     use_alpha_beta: true
+#     heuristic: score_diff
+
+#   - name: Minimax-score_mobility_special
+#     type: minimax
+#     depth: 8
+#     use_alpha_beta: true
+#     heuristic: score_mobility_special
+
+#   - name: MCTS-0.5s
+#     type: mcts
+#     simulation_time: .5
+#     max_iterations: 100000
+#     exploration_weight: 2
+
+#   - name: MCTS-1s
+#     type: mcts
+#     simulation_time: 1
+#     max_iterations: 200000
+#     exploration_weight: 1
 
 
   # - name: Minimax_score_diff_with_deadlock
