@@ -1,0 +1,54 @@
+# Debug Tournament Configuration for Kulibrat
+# This configuration is designed to identify potential issues with player/color bias
+
+# Tournament settings
+tournament:
+  matches_per_pairing: 5      # Number of matches between each player pair per color assignment
+  target_score: 5             # Score needed to win a match
+  max_turns: 100              # Maximum turns before declaring a draw
+
+# Player configurations
+players:
+  # Random baseline strategy
+  - name: Random
+    type: random
+
+  # Simple Minimax for baseline comparison
+  - name: Minimax-4
+    type: minimax
+    depth: 4
+    use_alpha_beta: true
+    heuristic: score_diff
+    
+  # Higher depth Minimax
+  - name: Minimax-6
+    type: minimax
+    depth: 6
+    use_alpha_beta: true
+    heuristic: score_diff
+
+  # Minimax with a different heuristic
+  - name: Minimax-Strategic
+    type: minimax
+    depth: 4
+    use_alpha_beta: true
+    heuristic: score_mobility_special
+    
+  # NegaScout implementation
+  - name: NegaScout
+    type: negascout
+    depth: 4
+    heuristic: score_diff
+    
+  # MCTS with moderate simulation time
+  - name: MCTS-05s
+    type: mcts
+    simulation_time: 0.5
+    max_iterations: 50000
+    exploration_weight: 1.41
+
+# Output configuration
+output:
+  results_dir: tournament_results
+  save_csv: true
+  save_plots: true
